@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "record_decoder.h"
+#include "serial/record_decoder.h"
 
 #include <cstdint>
 #include <memory>

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "record_encoder.h"
+#include "serial/record_encoder.h"
 
 #include <sys/types.h>
 

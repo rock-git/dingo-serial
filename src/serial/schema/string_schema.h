@@ -20,7 +20,7 @@
 #include <memory>
 #include <optional>
 
-#include "dingo_schema.h"
+#include "serial/schema/dingo_schema.h"
 
 namespace dingodb {
 

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "buf.h"
+#include "serial/buf.h"
 
 #include "serial/utils.h"
 

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "boolean_schema.h"
+#include "serial/schema/boolean_schema.h"
 
 namespace dingodb {
 

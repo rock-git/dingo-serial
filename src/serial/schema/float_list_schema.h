@@ -17,10 +17,11 @@
 
 #include <cstring>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <vector>
-#include <memory>
-#include "dingo_schema.h"
+
+#include "serial/schema/dingo_schema.h"
 
 namespace dingodb {
 
@@ -47,11 +48,11 @@ class DingoSchema<std::optional<std::shared_ptr<std::vector<float>>>> : public B
   void SetIsKey(bool key);
   void SetAllowNull(bool allow_null);
   void SetIsLe(bool le);
-  void EncodeKey(Buf* buf, std::optional<std::shared_ptr<std::vector<float>>> data);
-  void EncodeKeyPrefix(Buf* buf, std::optional<std::shared_ptr<std::vector<float>>> data);
-  std::optional<std::shared_ptr<std::vector<float>>> DecodeKey(Buf* buf);
-  void SkipKey(Buf* buf);
-  float InternalDecodeData(Buf* buf);
+  static void EncodeKey(Buf* buf, std::optional<std::shared_ptr<std::vector<float>>> data);
+  static void EncodeKeyPrefix(Buf* buf, std::optional<std::shared_ptr<std::vector<float>>> data);
+  static std::optional<std::shared_ptr<std::vector<float>>> DecodeKey(Buf* buf);
+  static void SkipKey(Buf* buf);
+  float InternalDecodeData(Buf* buf) const;
   void EncodeValue(Buf* buf, std::optional<std::shared_ptr<std::vector<float>>> data);
   std::optional<std::shared_ptr<std::vector<float>>> DecodeValue(Buf* buf);
   void SkipValue(Buf* buf);

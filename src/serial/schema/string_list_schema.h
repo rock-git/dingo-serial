@@ -20,7 +20,7 @@
 #include <memory>
 #include <optional>
 
-#include "dingo_schema.h"
+#include "serial/schema/dingo_schema.h"
 
 namespace dingodb {
 
@@ -34,7 +34,7 @@ class DingoSchema<std::optional<std::shared_ptr<std::vector<std::string>>>> : pu
   static int GetDataLength();
   static int GetWithNullTagLength();
   static void InternalEncodeValue(Buf* buf, std::shared_ptr<std::vector<std::string>> data);
-  static void InternalEmlementEncodeValue(Buf* buf, const std::string &data);
+  static void InternalEmlementEncodeValue(Buf* buf, const std::string& data);
 
  public:
   Type GetType() override;
@@ -46,13 +46,12 @@ class DingoSchema<std::optional<std::shared_ptr<std::vector<std::string>>>> : pu
   void SetIsKey(bool key);
   void SetAllowNull(bool allow_null);
 
-  void EncodeKey(Buf* buf, std::optional<std::shared_ptr<std::vector<std::string>>> data);
-  void EncodeKeyPrefix(Buf* buf, std::optional<std::shared_ptr<std::vector<std::string>>> data);
+  static void EncodeKey(Buf* buf, std::optional<std::shared_ptr<std::vector<std::string>>> data);
+  static void EncodeKeyPrefix(Buf* buf, std::optional<std::shared_ptr<std::vector<std::string>>> data);
   void EncodeValue(Buf* buf, std::optional<std::shared_ptr<std::vector<std::string>>> data);
+  static void SkipKey(Buf* buf);
 
-  void SkipKey(Buf* buf) const;
-
-  std::optional<std::shared_ptr<std::vector<std::string>>> DecodeKey(Buf* buf);
+  static std::optional<std::shared_ptr<std::vector<std::string>>> DecodeKey(Buf* buf);
   std::optional<std::shared_ptr<std::vector<std::string>>> DecodeValue(Buf* buf);
 
   void SkipValue(Buf* buf) const;

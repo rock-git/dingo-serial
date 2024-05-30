@@ -182,17 +182,17 @@ TEST_F(DingoSerialTest, keyvaluecodeStringLoopTest) {
   std::string key;
   std::string value;
   Counter load_cnter1;
-  load_cnter1.reStart();
+  load_cnter1.ReStart();
   (void)re->Encode('r', record1, key, value);
-  int64_t time_db_fetch1 = load_cnter1.mtimeElapsed();
+  int64_t time_db_fetch1 = load_cnter1.MtimeElapsed();
   std::cout << "Encode Time : " << time_db_fetch1 << " milliseconds" << '\n';
   // Decode record and verify values
   std::shared_ptr<RecordDecoder> rd = std::make_shared<RecordDecoder>(0, schemas, 0L, this->le);
   std::vector<std::any> decoded_records;
   Counter load_cnter2;
-  load_cnter2.reStart();
+  load_cnter2.ReStart();
   (void)rd->Decode(key, value, decoded_records);
-  std::cout << "Decode Time : " << load_cnter2.mtimeElapsed() << " milliseconds" << '\n';
+  std::cout << "Decode Time : " << load_cnter2.MtimeElapsed() << " milliseconds" << '\n';
   std::cout << "Decode output records size:" << decoded_records.size() << '\n';
 
   // Decode record selection columns
@@ -206,11 +206,11 @@ TEST_F(DingoSerialTest, keyvaluecodeStringLoopTest) {
     std::vector<int>& column_indexes = indexes;
     std::vector<std::any> decoded_s_records;
     Counter load_cnter3;
-    load_cnter3.reStart();
+    load_cnter3.ReStart();
     // std::sort(column_indexes.begin(), column_indexes.end());
     (void)rd->Decode(key, value, column_indexes, decoded_s_records);
     std::cout << "Decode selection columns size:" << selection_columns_size
-              << ", need Time : " << load_cnter3.mtimeElapsed() << " milliseconds" << '\n';
+              << ", need Time : " << load_cnter3.MtimeElapsed() << " milliseconds" << '\n';
     std::cout << "Decode selection output records size:" << decoded_s_records.size() << '\n';
   }
   {
@@ -223,11 +223,11 @@ TEST_F(DingoSerialTest, keyvaluecodeStringLoopTest) {
     std::vector<int>& column_indexes = indexes;
     std::vector<std::any> decoded_s_records;
     Counter load_cnter3;
-    load_cnter3.reStart();
+    load_cnter3.ReStart();
     // std::sort(column_indexes.begin(), column_indexes.end());
     (void)rd->Decode(key, value, column_indexes, decoded_s_records);
     std::cout << "Decode selection columns size:" << selection_columns_size
-              << ", need Time : " << load_cnter3.mtimeElapsed() << " milliseconds" << '\n';
+              << ", need Time : " << load_cnter3.MtimeElapsed() << " milliseconds" << '\n';
     std::cout << "Decode selection output records size:" << decoded_s_records.size() << '\n';
   }
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "double_schema.h"
+#include "serial/schema/double_schema.h"
 
 namespace dingodb {
 

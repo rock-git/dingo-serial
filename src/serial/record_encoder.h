@@ -19,22 +19,22 @@
 #include <string>
 
 #include "any"
-#include "functional"  // IWYU pragma: keep
-#include "keyvalue.h"  // IWYU pragma: keep
-#include "optional"    // IWYU pragma: keep
-#include "schema/boolean_list_schema.h"
-#include "schema/boolean_schema.h"  // IWYU pragma: keep
-#include "schema/double_list_schema.h"
-#include "schema/double_schema.h"  // IWYU pragma: keep
-#include "schema/float_list_schema.h"
-#include "schema/float_schema.h"  // IWYU pragma: keep
-#include "schema/integer_list_schema.h"
-#include "schema/integer_schema.h"  // IWYU pragma: keep
-#include "schema/long_list_schema.h"
-#include "schema/long_schema.h"  // IWYU pragma: keep
-#include "schema/string_list_schema.h"
-#include "schema/string_schema.h"  // IWYU pragma: keep
-#include "utils.h"                 // IWYU pragma: keep
+#include "functional"         // IWYU pragma: keep
+#include "optional"           // IWYU pragma: keep
+#include "serial/keyvalue.h"  // IWYU pragma: keep
+#include "serial/schema/boolean_list_schema.h"
+#include "serial/schema/boolean_schema.h"  // IWYU pragma: keep
+#include "serial/schema/double_list_schema.h"
+#include "serial/schema/double_schema.h"  // IWYU pragma: keep
+#include "serial/schema/float_list_schema.h"
+#include "serial/schema/float_schema.h"  // IWYU pragma: keep
+#include "serial/schema/integer_list_schema.h"
+#include "serial/schema/integer_schema.h"  // IWYU pragma: keep
+#include "serial/schema/long_list_schema.h"
+#include "serial/schema/long_schema.h"  // IWYU pragma: keep
+#include "serial/schema/string_list_schema.h"
+#include "serial/schema/string_schema.h"  // IWYU pragma: keep
+#include "serial/utils.h"                 // IWYU pragma: keep
 
 namespace dingodb {
 

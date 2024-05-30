@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "float_schema.h"
+#include "serial/schema/float_schema.h"
 
 namespace dingodb {
 
@@ -161,7 +161,7 @@ std::optional<float> DingoSchema<std::optional<float>>::DecodeKey(Buf* buf) {
       for (int i = 1; i < 4; i++) {
         in |= (((uint32_t)buf->Read() & 0xFF) << (8 * i));
       }
-      in= ~in;
+      in = ~in;
     }
   }
   float d;

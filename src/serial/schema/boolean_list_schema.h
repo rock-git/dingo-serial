@@ -16,11 +16,11 @@
 #define DINGO_SERIAL_BOOLEAN_LIST_SCHEMA_H_
 
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <vector>
-#include <memory>
 
-#include "dingo_schema.h"
+#include "serial/schema/dingo_schema.h"
 
 namespace dingodb {
 
@@ -45,10 +45,10 @@ class DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>> : public Ba
   void SetIndex(int index);
   void SetIsKey(bool key);
   void SetAllowNull(bool allow_null);
-  void EncodeKey(Buf* buf, std::optional<std::shared_ptr<std::vector<bool>>> data);
-  void EncodeKeyPrefix(Buf* buf, std::optional<std::shared_ptr<std::vector<bool>>> data);
-  std::optional<std::shared_ptr<std::vector<bool>>> DecodeKey(Buf* buf);
-  void SkipKey(Buf* buf);
+  static void EncodeKey(Buf* buf, std::optional<std::shared_ptr<std::vector<bool>>> data);
+  static void EncodeKeyPrefix(Buf* buf, std::optional<std::shared_ptr<std::vector<bool>>> data);
+  static std::optional<std::shared_ptr<std::vector<bool>>> DecodeKey(Buf* buf);
+  static void SkipKey(Buf* buf);
   void EncodeValue(Buf* buf, std::optional<std::shared_ptr<std::vector<bool>>> data);
   std::optional<std::shared_ptr<std::vector<bool>>> DecodeValue(Buf* buf);
   void SkipValue(Buf* buf);

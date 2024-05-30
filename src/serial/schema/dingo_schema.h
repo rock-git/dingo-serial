@@ -15,8 +15,8 @@
 #ifndef DINGO_SERIAL_DINGO_SCHEMA_H_
 #define DINGO_SERIAL_DINGO_SCHEMA_H_
 
-#include "base_schema.h"
 #include "serial/buf.h"
+#include "serial/schema/base_schema.h"
 
 namespace dingodb {
 

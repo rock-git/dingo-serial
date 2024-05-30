@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "boolean_list_schema.h"
+#include "serial/schema/boolean_list_schema.h"
 
 namespace dingodb {
 
@@ -20,7 +20,9 @@ int DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::GetDataLengt
 
 int DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::GetWithNullTagLength() { return 2; }
 
-void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::InternalEncodeValue(Buf* buf, bool data) { buf->Write(data); }
+void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::InternalEncodeValue(Buf* buf, bool data) {
+  buf->Write(data);
+}
 
 void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::InternalEncodeNull(Buf* buf) { buf->Write(0); }
 
@@ -41,30 +43,40 @@ int DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::GetLength() 
   return GetDataLength();
 }
 
-void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::SetAllowNull(bool allow_null) { this->allow_null_ = allow_null; }
+void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::SetAllowNull(bool allow_null) {
+  this->allow_null_ = allow_null;
+}
 
 bool DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::AllowNull() { return this->allow_null_; }
 
-void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::EncodeKey(Buf* buf, std::optional<std::shared_ptr<std::vector<bool>>> data) {
+void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::EncodeKey(
+    Buf* /*buf*/, std::optional<std::shared_ptr<std::vector<bool>>> /*data*/) {
   throw std::runtime_error("Unsupported EncodeKey List Type");
 }
 
-void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::EncodeKeyPrefix(Buf* buf, std::optional<std::shared_ptr<std::vector<bool>>> data) { EncodeKey(buf, data); }
+void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::EncodeKeyPrefix(
+    Buf* buf, std::optional<std::shared_ptr<std::vector<bool>>> data) {
+  EncodeKey(buf, data);
+}
 
-std::optional<std::shared_ptr<std::vector<bool>>> DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::DecodeKey(Buf* buf) {
+std::optional<std::shared_ptr<std::vector<bool>>>
+DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::DecodeKey(Buf* /*buf*/) {
   throw std::runtime_error("Unsupported EncodeKey List Type");
 }
 
-void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::SkipKey(Buf* buf) { throw std::runtime_error("Unsupported EncodeKey List Type");}
+void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::SkipKey(Buf* /*buf*/) {
+  throw std::runtime_error("Unsupported EncodeKey List Type");
+}
 
-void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::EncodeValue(Buf* buf, std::optional<std::shared_ptr<std::vector<bool>>> data) {
+void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::EncodeValue(
+    Buf* buf, std::optional<std::shared_ptr<std::vector<bool>>> data) {
   if (this->allow_null_) {
     if (data.has_value()) {
       int data_size = data.value()->size();
       buf->EnsureRemainder(5 + data_size);
       buf->Write(k_not_null);
       buf->WriteInt(data_size);
-      for (const bool &value : *data.value()) {
+      for (const bool value : *data.value()) {
         InternalEncodeValue(buf, value);
       }
     } else {
@@ -76,7 +88,7 @@ void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::EncodeValue
       int data_size = data.value()->size();
       buf->EnsureRemainder(4 + data_size);
       buf->WriteInt(data_size);
-      for (const bool &value : *data.value()) {
+      for (const bool value : *data.value()) {
         InternalEncodeValue(buf, value);
       }
     } else {
@@ -85,7 +97,8 @@ void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::EncodeValue
   }
 }
 
-std::optional<std::shared_ptr<std::vector<bool>>> DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::DecodeValue(Buf* buf) {
+std::optional<std::shared_ptr<std::vector<bool>>>
+DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::DecodeValue(Buf* buf) {
   if (this->allow_null_) {
     if (buf->Read() == this->k_null) {
       return std::nullopt;
@@ -97,17 +110,17 @@ std::optional<std::shared_ptr<std::vector<bool>>> DingoSchema<std::optional<std:
     bool b = buf->Read();
     (*vector)[i] = b;
   }
-   return vector;
+  return vector;
 }
 
-void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::SkipValue(Buf* buf) { 
+void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::SkipValue(Buf* buf) {
   if (this->allow_null_) {
     if (buf->Read() == this->k_null) {
       return;
     }
   }
   int length = buf->ReadInt();
-  buf->Skip(length); 
+  buf->Skip(length);
 }
 
 }  // namespace dingodb

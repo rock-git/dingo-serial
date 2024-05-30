@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "double_list_schema.h"
+#include "serial/schema/double_list_schema.h"
 
 #include <cstring>
 

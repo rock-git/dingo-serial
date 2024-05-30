@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "float_list_schema.h"
+#include "serial/schema/float_list_schema.h"
 
 namespace dingodb {
 
@@ -55,24 +55,34 @@ int DingoSchema<std::optional<std::shared_ptr<std::vector<float>>>>::GetLength()
   return GetDataLength();
 }
 
-void DingoSchema<std::optional<std::shared_ptr<std::vector<float>>>>::SetAllowNull(bool allow_null) { this->allow_null_ = allow_null; }
+void DingoSchema<std::optional<std::shared_ptr<std::vector<float>>>>::SetAllowNull(bool allow_null) {
+  this->allow_null_ = allow_null;
+}
 
 bool DingoSchema<std::optional<std::shared_ptr<std::vector<float>>>>::AllowNull() { return allow_null_; }
 
 void DingoSchema<std::optional<std::shared_ptr<std::vector<float>>>>::SetIsLe(bool le) { this->le_ = le; }
 
-void DingoSchema<std::optional<std::shared_ptr<std::vector<float>>>>::EncodeKey(Buf* buf, std::optional<std::shared_ptr<std::vector<float>>> data) {
-    throw std::runtime_error("Unsupported EncodeKey List Type");
+void DingoSchema<std::optional<std::shared_ptr<std::vector<float>>>>::EncodeKey(
+    Buf* /*buf*/, std::optional<std::shared_ptr<std::vector<float>>> /*data*/) {
+  throw std::runtime_error("Unsupported EncodeKey List Type");
 }
 
-void DingoSchema<std::optional<std::shared_ptr<std::vector<float>>>>::EncodeKeyPrefix(Buf* buf, std::optional<std::shared_ptr<std::vector<float>>> data) { throw std::runtime_error("Unsupported EncodeKey List Type"); }
-std::optional<std::shared_ptr<std::vector<float>>> DingoSchema<std::optional<std::shared_ptr<std::vector<float>>>>::DecodeKey(Buf* buf) {
-    throw std::runtime_error("Unsupported EncodeKey List Type");
+void DingoSchema<std::optional<std::shared_ptr<std::vector<float>>>>::EncodeKeyPrefix(
+    Buf* /*buf*/, std::optional<std::shared_ptr<std::vector<float>>> /*data*/) {
+  throw std::runtime_error("Unsupported EncodeKey List Type");
+}
+std::optional<std::shared_ptr<std::vector<float>>>
+DingoSchema<std::optional<std::shared_ptr<std::vector<float>>>>::DecodeKey(Buf* /*buf*/) {
+  throw std::runtime_error("Unsupported EncodeKey List Type");
 }
 
-void DingoSchema<std::optional<std::shared_ptr<std::vector<float>>>>::SkipKey(Buf* buf) { throw std::runtime_error("Unsupported EncodeKey List Type"); }
+void DingoSchema<std::optional<std::shared_ptr<std::vector<float>>>>::SkipKey(Buf* /*buf*/) {
+  throw std::runtime_error("Unsupported EncodeKey List Type");
+}
 
-void DingoSchema<std::optional<std::shared_ptr<std::vector<float>>>>::EncodeValue(Buf* buf, std::optional<std::shared_ptr<std::vector<float>>> data) {
+void DingoSchema<std::optional<std::shared_ptr<std::vector<float>>>>::EncodeValue(
+    Buf* buf, std::optional<std::shared_ptr<std::vector<float>>> data) {
   if (this->allow_null_) {
     if (data.has_value()) {
       int data_size = data.value()->size();
@@ -108,7 +118,7 @@ void DingoSchema<std::optional<std::shared_ptr<std::vector<float>>>>::EncodeValu
   }
 }
 
-float DingoSchema<std::optional<std::shared_ptr<std::vector<float>>>>::InternalDecodeData(Buf* buf) {
+float DingoSchema<std::optional<std::shared_ptr<std::vector<float>>>>::InternalDecodeData(Buf* buf) const {
   uint32_t in = buf->Read() & 0xFF;
   if (this->le_) {
     for (int i = 0; i < 3; i++) {
@@ -120,13 +130,14 @@ float DingoSchema<std::optional<std::shared_ptr<std::vector<float>>>>::InternalD
       in |= (((uint32_t)buf->Read() & 0xFF) << (8 * i));
     }
   }
-//   float d;
-//   memcpy(&d, &in, 4);
-//   return d;
+  //   float d;
+  //   memcpy(&d, &in, 4);
+  //   return d;
   return *reinterpret_cast<float*>(&in);
 }
 
-std::optional<std::shared_ptr<std::vector<float>>> DingoSchema<std::optional<std::shared_ptr<std::vector<float>>>>::DecodeValue(Buf* buf) {
+std::optional<std::shared_ptr<std::vector<float>>>
+DingoSchema<std::optional<std::shared_ptr<std::vector<float>>>>::DecodeValue(Buf* buf) {
   if (this->allow_null_) {
     if (buf->Read() == this->k_null) {
       return std::nullopt;

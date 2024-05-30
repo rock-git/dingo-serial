@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "string_schema.h"
+#include "serial/schema/string_schema.h"
 
 #include <memory>
 #include <string>
