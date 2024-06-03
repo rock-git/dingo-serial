@@ -20,41 +20,30 @@
 #include <memory>
 #include <optional>
 
-#include "serial/schema/dingo_schema.h"
+#include "dingo_schema.h"
 
 namespace dingodb {
 
 template <>
-
-class DingoSchema<std::optional<std::shared_ptr<std::vector<std::string>>>> : public BaseSchema {
- private:
-  int index_;
-  bool key_, allow_null_;
-
-  static int GetDataLength();
-  static int GetWithNullTagLength();
-  static void InternalEncodeValue(Buf* buf, std::shared_ptr<std::vector<std::string>> data);
-  static void InternalEmlementEncodeValue(Buf* buf, const std::string& data);
-
+class DingoSchema<std::vector<std::string>> : public BaseSchema {
  public:
-  Type GetType() override;
-  bool AllowNull() override;
+  Type GetType() override { return kStringList; }
   int GetLength() override;
-  bool IsKey() override;
-  int GetIndex() override;
-  void SetIndex(int index);
-  void SetIsKey(bool key);
-  void SetAllowNull(bool allow_null);
 
-  static void EncodeKey(Buf* buf, std::optional<std::shared_ptr<std::vector<std::string>>> data);
-  static void EncodeKeyPrefix(Buf* buf, std::optional<std::shared_ptr<std::vector<std::string>>> data);
-  void EncodeValue(Buf* buf, std::optional<std::shared_ptr<std::vector<std::string>>> data);
-  static void SkipKey(Buf* buf);
+  BaseSchemaPtr Clone() override { return std::make_shared<DingoSchema<std::vector<std::string>>>(); }
 
-  static std::optional<std::shared_ptr<std::vector<std::string>>> DecodeKey(Buf* buf);
-  std::optional<std::shared_ptr<std::vector<std::string>>> DecodeValue(Buf* buf);
+  int SkipKey(Buf& buf) override;
+  int SkipValue(Buf& buf) override;
 
-  void SkipValue(Buf* buf) const;
+  int EncodeKey(const std::any& data, Buf& buf) override;
+  int EncodeValue(const std::any& data, Buf& buf) override;
+
+  std::any DecodeKey(Buf& buf) override;
+  std::any DecodeValue(Buf& buf) override;
+
+ private:
+  static int EncodeStringListNotComparable(const std::vector<std::string>& data, Buf& buf);
+  static void DecodeStringListNotComparable(Buf& buf, std::vector<std::string>& data);
 };
 
 }  // namespace dingodb

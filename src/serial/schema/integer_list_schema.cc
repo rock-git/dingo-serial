@@ -12,146 +12,116 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "serial/schema/integer_list_schema.h"
+#include "integer_list_schema.h"
+
+#include <cstdint>
+#include <utility>
+
+#include "serial/compiler.h"
 
 namespace dingodb {
 
-int DingoSchema<std::optional<std::shared_ptr<std::vector<int32_t>>>>::GetDataLength() { return 4; }
+constexpr int kDataLength = 4;
+constexpr int kDataWithNullLength = 5;
 
-int DingoSchema<std::optional<std::shared_ptr<std::vector<int32_t>>>>::GetWithNullTagLength() { return 5; }
+void DingoSchema<std::vector<int32_t>>::EncodeIntList(const std::vector<int32_t>& data, Buf& buf) {
+  buf.WriteInt(data.size());
 
-void DingoSchema<std::optional<std::shared_ptr<std::vector<int32_t>>>>::LeInternalEncodeValue(Buf* buf, int32_t data) {
-  uint32_t* i = (uint32_t*)&data;
-  buf->Write(*i >> 24);
-  buf->Write(*i >> 16);
-  buf->Write(*i >> 8);
-  buf->Write(*i);
-}
-
-void DingoSchema<std::optional<std::shared_ptr<std::vector<int32_t>>>>::BeInternalEncodeValue(Buf* buf, int32_t data) {
-  uint32_t* i = (uint32_t*)&data;
-  buf->Write(*i);
-  buf->Write(*i >> 8);
-  buf->Write(*i >> 16);
-  buf->Write(*i >> 24);
-}
-
-BaseSchema::Type DingoSchema<std::optional<std::shared_ptr<std::vector<int32_t>>>>::GetType() { return kIntegerList; }
-
-void DingoSchema<std::optional<std::shared_ptr<std::vector<int32_t>>>>::SetIndex(int index) { this->index_ = index; }
-
-int DingoSchema<std::optional<std::shared_ptr<std::vector<int32_t>>>>::GetIndex() { return this->index_; }
-
-void DingoSchema<std::optional<std::shared_ptr<std::vector<int32_t>>>>::SetIsKey(bool key) { this->key_ = key; }
-
-bool DingoSchema<std::optional<std::shared_ptr<std::vector<int32_t>>>>::IsKey() { return this->key_; }
-
-int DingoSchema<std::optional<std::shared_ptr<std::vector<int32_t>>>>::GetLength() {
-  if (this->allow_null_) {
-    return GetWithNullTagLength();
-  }
-  return GetDataLength();
-}
-
-void DingoSchema<std::optional<std::shared_ptr<std::vector<int32_t>>>>::SetAllowNull(bool allow_null) {
-  this->allow_null_ = allow_null;
-}
-
-bool DingoSchema<std::optional<std::shared_ptr<std::vector<int32_t>>>>::AllowNull() { return this->allow_null_; }
-
-void DingoSchema<std::optional<std::shared_ptr<std::vector<int32_t>>>>::SetIsLe(bool le) { this->le_ = le; }
-
-void DingoSchema<std::optional<std::shared_ptr<std::vector<int32_t>>>>::EncodeKey(
-    Buf* /*buf*/, std::optional<std::shared_ptr<std::vector<int32_t>>> /*data*/) {
-  throw std::runtime_error("Unsupported EncodeKey List Type");
-}
-
-void DingoSchema<std::optional<std::shared_ptr<std::vector<int32_t>>>>::EncodeKeyPrefix(
-    Buf* /*buf*/, std::optional<std::shared_ptr<std::vector<int32_t>>> /*data*/) {
-  throw std::runtime_error("Unsupported EncodeKey List Type");
-}
-
-std::optional<std::shared_ptr<std::vector<int32_t>>>
-DingoSchema<std::optional<std::shared_ptr<std::vector<int32_t>>>>::DecodeKey(Buf* /*buf*/) {
-  throw std::runtime_error("Unsupported EncodeKey List Type");
-}
-
-void DingoSchema<std::optional<std::shared_ptr<std::vector<int32_t>>>>::SkipKey(Buf* /*buf*/) {
-  throw std::runtime_error("Unsupported EncodeKey List Type");
-}
-
-void DingoSchema<std::optional<std::shared_ptr<std::vector<int32_t>>>>::EncodeValue(
-    Buf* buf, std::optional<std::shared_ptr<std::vector<int32_t>>> data) {
-  if (this->allow_null_) {
-    if (data.has_value()) {
-      int data_size = data.value()->size();
-      buf->EnsureRemainder(5 + data_size * 4);
-      buf->Write(k_not_null);
-      buf->WriteInt(data_size);
-      for (const int32_t& value : *data.value()) {
-        if (this->le_) {
-          LeInternalEncodeValue(buf, value);
-        } else {
-          BeInternalEncodeValue(buf, value);
-        }
-      }
-    } else {
-      buf->EnsureRemainder(1);
-      buf->Write(k_null);
+  if (DINGO_LIKELY(IsLe())) {
+    for (const int32_t& value : data) {
+      uint32_t* v = (uint32_t*)&value;
+      buf.Write(*v >> 24);
+      buf.Write(*v >> 16);
+      buf.Write(*v >> 8);
+      buf.Write(*v);
     }
   } else {
-    if (data.has_value()) {
-      int data_size = data.value()->size();
-      buf->EnsureRemainder(4 + data_size * 4);
-      buf->WriteInt(data_size);
-      for (const int32_t& value : *data.value()) {
-        if (this->le_) {
-          LeInternalEncodeValue(buf, value);
-        } else {
-          BeInternalEncodeValue(buf, value);
-        }
-      }
-    } else {
-      // WRONG EMPTY DATA
+    for (const int32_t& value : data) {
+      uint32_t* v = (uint32_t*)&value;
+      buf.Write(*v);
+      buf.Write(*v >> 8);
+      buf.Write(*v >> 16);
+      buf.Write(*v >> 24);
     }
   }
 }
 
-uint32_t DingoSchema<std::optional<std::shared_ptr<std::vector<int32_t>>>>::InternalDecodeData(Buf* buf) const {
-  if (this->le_) {
-    uint32_t r = ((buf->Read() & 0xFF) << 24) | ((buf->Read() & 0xFF) << 16) | ((buf->Read() & 0xFF) << 8) |
-                 (buf->Read() & 0xFF);
-    return r;
+void DingoSchema<std::vector<int32_t>>::DecodeIntList(Buf& buf, std::vector<int32_t>& data) {
+  int size = buf.ReadInt();
+  data.resize(size);
+
+  if (DINGO_LIKELY(IsLe())) {
+    for (int i = 0; i < size; ++i) {
+      uint32_t value =
+          ((buf.Read() & 0xFF) << 24) | ((buf.Read() & 0xFF) << 16) | ((buf.Read() & 0xFF) << 8) | (buf.Read() & 0xFF);
+      data[i] = static_cast<int32_t>(value);
+    }
+
   } else {
-    uint32_t r = (buf->Read() & 0xFF) | ((buf->Read() & 0xFF) << 8) | ((buf->Read() & 0xFF) << 16) |
-                 ((buf->Read() & 0xFF) << 24);
-    return r;
+    for (int i = 0; i < size; ++i) {
+      uint32_t value =
+          (buf.Read() & 0xFF) | ((buf.Read() & 0xFF) << 8) | ((buf.Read() & 0xFF) << 16) | ((buf.Read() & 0xFF) << 24);
+      data[i] = static_cast<int32_t>(value);
+    }
   }
 }
 
-std::optional<std::shared_ptr<std::vector<int32_t>>>
-DingoSchema<std::optional<std::shared_ptr<std::vector<int32_t>>>>::DecodeValue(Buf* buf) {
-  if (this->allow_null_) {
-    if (buf->Read() == this->k_null) {
-      return std::nullopt;
-    }
-  }
-  int length = buf->ReadInt();
-  std::shared_ptr<std::vector<int32_t>> data = std::make_shared<std::vector<int32_t>>();
-  data->reserve(length);
-  for (int i = 0; i < length; i++) {
-    data->emplace_back(InternalDecodeData(buf));
-  }
-  return data;
+int DingoSchema<std::vector<int32_t>>::GetLength() {
+  throw std::runtime_error("int list unsupport length");
+  return -1;
 }
 
-void DingoSchema<std::optional<std::shared_ptr<std::vector<int32_t>>>>::SkipValue(Buf* buf) {
-  if (this->allow_null_) {
-    if (buf->Read() == this->k_null) {
-      return;
-    }
-  }
-  int length = buf->ReadInt();
-  buf->Skip(length * 4);
+int DingoSchema<std::vector<int32_t>>::SkipKey(Buf&) {
+  throw std::runtime_error("Unsupport encode key list type");
+  return -1;
 }
+
+int DingoSchema<std::vector<int32_t>>::SkipValue(Buf& buf) {
+  if (buf.Read() == k_null) {
+    return 1;
+  }
+  int32_t size = buf.ReadInt() * 4;
+  buf.Skip(size);
+
+  return size + 5;
+}
+
+int DingoSchema<std::vector<int32_t>>::EncodeKey(const std::any&, Buf&) {
+  throw std::runtime_error("Unsupport encode key list type");
+  return -1;
+}
+
+// {is_null: 1byte}|{n:4byte}|{value: 4byte}*n
+int DingoSchema<std::vector<int32_t>>::EncodeValue(const std::any& data, Buf& buf) {
+  if (DINGO_UNLIKELY(!AllowNull() && !data.has_value())) {
+    throw std::runtime_error("Not allow null, but data not has value.");
+  }
+
+  if (data.has_value()) {
+    buf.Write(k_not_null);
+    const auto& ref_data = std::any_cast<const std::vector<int32_t>&>(data);
+    EncodeIntList(ref_data, buf);
+
+    return ref_data.size() * 4 + 5;
+  } else {
+    buf.Write(k_null);
+    return 1;
+  }
+}
+
+std::any DingoSchema<std::vector<int32_t>>::DecodeKey(Buf&) {
+  throw std::runtime_error("Unsupport encode key list type");
+}
+
+std::any DingoSchema<std::vector<int32_t>>::DecodeValue(Buf& buf) {
+  if (buf.Read() == k_null) {
+    return std::any();
+  }
+
+  std::vector<int32_t> data;
+  DecodeIntList(buf, data);
+
+  return std::move(std::any(std::move(data)));
+}
+
 }  // namespace dingodb

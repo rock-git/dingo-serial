@@ -20,23 +20,22 @@
 #include <memory>
 #include <vector>
 
-#include "serial/schema/base_schema.h"
-#include "serial/schema/boolean_schema.h"
-#include "serial/schema/double_list_schema.h"
-#include "serial/schema/double_schema.h"
-#include "serial/schema/float_list_schema.h"
-#include "serial/schema/integer_list_schema.h"
-#include "serial/schema/integer_schema.h"
-#include "serial/schema/long_list_schema.h"
-#include "serial/schema/long_schema.h"
-#include "serial/schema/string_list_schema.h"
-#include "serial/schema/string_schema.h"
+#include "schema/base_schema.h"
+#include "schema/boolean_schema.h"
+#include "schema/double_list_schema.h"
+#include "schema/double_schema.h"
+#include "schema/float_list_schema.h"
+#include "schema/integer_list_schema.h"
+#include "schema/integer_schema.h"
+#include "schema/long_list_schema.h"
+#include "schema/long_schema.h"
+#include "schema/string_list_schema.h"
+#include "schema/string_schema.h"
 
 namespace dingodb {
 
-void SortSchema(std::shared_ptr<std::vector<std::shared_ptr<BaseSchema>>> schemas);
-void FormatSchema(std::shared_ptr<std::vector<std::shared_ptr<BaseSchema>>> schemas, bool le);
-int* GetApproPerRecordSize(std::shared_ptr<std::vector<std::shared_ptr<BaseSchema>>> schemas);
+void SortSchema(std::vector<BaseSchemaPtr>& schemas);
+void FormatSchema(std::vector<BaseSchemaPtr>& schemas, bool le);
 
 bool VectorFindAndRemove(std::vector<int>* v, int t);
 // bool VectorFind(const std::vector<int>& v, int t);
@@ -44,6 +43,13 @@ bool VectorFindAndRemove(std::vector<int>* v, int t);
 inline bool VectorFind(const std::vector<int>& v, int t, int n) { return v[n] == t; }
 
 bool IsLE();
+
+// string type cast
+bool StringToBool(const std::string& str);
+int32_t StringToInt32(const std::string& str);
+int64_t StringToInt64(const std::string& str);
+float StringToFloat(const std::string& str);
+double StringToDouble(const std::string& str);
 
 }  // namespace dingodb
 

@@ -20,13 +20,13 @@
 #include <cstdint>
 #include <iostream>
 
-class Counter {
- private:
-  timeval s_;
-  timeval sc_;
+namespace dingodb {
 
+class Counter {
  public:
   Counter() { gettimeofday(&s_, nullptr); }
+  virtual ~Counter() = default;
+
   void ReStart() { gettimeofday(&s_, nullptr); }
   void SaveCounter() { gettimeofday(&sc_, nullptr); }
   int TimeElapsedBeforeLastSave() const { return (((sc_.tv_sec - s_.tv_sec) * 1000000) + (sc_.tv_usec - s_.tv_usec)); }
@@ -44,48 +44,49 @@ class Counter {
   }
 
   static std::string GetSysTime() {
-    time_t rawtime;
     char c[128];
     struct tm timeinfo;
-    auto r = time(&rawtime);
+    time_t rawtime = time(nullptr);
     localtime_r(&rawtime, &timeinfo);
-    auto r1 = strftime(c, sizeof(c), "%c", &timeinfo);  // Replace asctime_r with strftime
+    asctime_r(&timeinfo, c);
     return std::string(c);
   }
-  virtual ~Counter() = default;
+
+ private:
+  timeval s_;
+  timeval sc_;
 };
 
 class Clock {
  public:
   Clock() {
-    m_total_.tv_sec = 0;
-    m_total_.tv_nsec = 0;
-    m_isStart_ = false;
+    start_.tv_sec = 0;
+    start_.tv_nsec = 0;
+    total_.tv_sec = 0;
+    total_.tv_nsec = 0;
   }
 
   void Start() {
-    if (!m_isStart_) {
-      clock_gettime(CLOCK_REALTIME, &m_start_);
-      m_isStart_ = true;
+    if (!is_start_) {
+      clock_gettime(CLOCK_REALTIME, &start_);
+      is_start_ = true;
     }
   }
 
   void Stop() {
-    if (m_isStart_) {
+    if (is_start_) {
       struct timespec end;
       clock_gettime(CLOCK_REALTIME, &end);
-      Add(m_total_, Diff(m_start_, end));
-      m_isStart_ = false;
+      Add(total_, Diff(start_, end));
+      is_start_ = false;
     }
   }
 
-  time_t Second() const { return m_total_.tv_sec; }
+  time_t Second() const { return total_.tv_sec; }
 
-  int64_t Nsecond() const { return m_total_.tv_nsec; }
+  int64_t Nsecond() const { return total_.tv_nsec; }
 
  private:
-  bool m_isStart_;
-
   static void Add(struct timespec& dst, const struct timespec& src) {
     dst.tv_sec += src.tv_sec;
     dst.tv_nsec += src.tv_nsec;
@@ -106,8 +107,12 @@ class Clock {
     }
     return temp;
   }
-  struct timespec m_start_;
-  struct timespec m_total_;
+
+  bool is_start_{false};
+  struct timespec start_;
+  struct timespec total_;
 };
+
+}  // namespace dingodb
 
 #endif

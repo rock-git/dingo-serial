@@ -21,19 +21,20 @@
 namespace dingodb {
 
 class KeyValue {
- private:
-  std::shared_ptr<std::string> key_;
-  std::shared_ptr<std::string> value_;
-
  public:
-  KeyValue();
-  KeyValue(std::shared_ptr<std::string> key, std::shared_ptr<std::string> value);
+  KeyValue() = default;
+  KeyValue(const std::string& key, const std::string& value);
   ~KeyValue() = default;
-  void Set(std::shared_ptr<std::string> key, std::shared_ptr<std::string> value);
-  void SetKey(std::shared_ptr<std::string> key);
-  void SetValue(std::shared_ptr<std::string> value);
-  std::shared_ptr<std::string> GetKey() const;
-  std::shared_ptr<std::string> GetValue() const;
+
+  void Set(const std::string& key, const std::string& value);
+  void SetKey(const std::string& key);
+  void SetValue(const std::string& value);
+  const std::string& GetKey() const;
+  const std::string& GetValue() const;
+
+ private:
+  std::string key_;
+  std::string value_;
 };
 
 }  // namespace dingodb

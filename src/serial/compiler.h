@@ -12,24 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "keyvalue.h"
-
-#include <memory>
-#include <string>
+#ifndef DINGO_SERIAL_COMPILER_H_
+#define DINGO_SERIAL_COMPILER_H_
 
 namespace dingodb {
 
-KeyValue::KeyValue(const std::string& key, const std::string& value) : key_(key), value_(value) {}
+#define COMPILER_GCC
 
-void KeyValue::Set(const std::string& key, const std::string& value) {
-  this->key_ = key;
-  this->value_ = value;
-}
-
-void KeyValue::SetKey(const std::string& key) { this->key_ = key; }
-void KeyValue::SetValue(const std::string& value) { this->value_ = value; }
-
-const std::string& KeyValue::GetKey() const { return key_; }
-const std::string& KeyValue::GetValue() const { return value_; }
+#if defined(COMPILER_GCC)
+#if defined(__cplusplus)
+#define DINGO_LIKELY(expr) (__builtin_expect((bool)(expr), true))
+#define DINGO_UNLIKELY(expr) (__builtin_expect((bool)(expr), false))
+#else
+#define DINGO_LIKELY(expr) (__builtin_expect(!!(expr), 1))
+#define DINGO_UNLIKELY(expr) (__builtin_expect(!!(expr), 0))
+#endif
+#else
+#define DINGO_LIKELY(expr) (expr)
+#define DINGO_UNLIKELY(expr) (expr)
+#endif
 
 }  // namespace dingodb
+
+#endif  // DINGO_SERIAL_COMPILER_H_

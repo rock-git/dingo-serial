@@ -14,482 +14,452 @@
 
 #include <byteswap.h>
 #include <gtest/gtest.h>
-#include <serial/record_decoder.h>
-#include <serial/record_encoder.h>
-#include <serial/utils.h>
 
 #include <algorithm>
+#include <any>
 #include <bitset>
+#include <cstdint>
+#include <cstring>
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 
-// #include "serial/keyvalue_codec.h"
+#include "serial/record_decoder.h"
+#include "serial/record_encoder.h"
 #include "serial/schema/base_schema.h"
+#include "serial/utils.h"
 
 using namespace dingodb;
-using namespace std;
 
 class DingoSerialTest : public testing::Test {
- private:
-  std::shared_ptr<vector<std::shared_ptr<BaseSchema>>> schemas_;
-  vector<any>* record_;
-
  public:
   void InitVector() {
-    schemas_ = std::make_shared<vector<std::shared_ptr<BaseSchema>>>(11);
+    schemas_.resize(11);
 
-    auto id = std::make_shared<DingoSchema<optional<int32_t>>>();
+    auto id = std::make_shared<DingoSchema<int32_t>>();
     id->SetIndex(0);
     id->SetAllowNull(false);
     id->SetIsKey(true);
-    schemas_->at(0) = id;
+    schemas_.at(0) = id;
 
-    auto name = std::make_shared<DingoSchema<optional<shared_ptr<string>>>>();
+    auto name = std::make_shared<DingoSchema<std::string>>();
     name->SetIndex(1);
     name->SetAllowNull(false);
     name->SetIsKey(true);
-    schemas_->at(1) = name;
+    schemas_.at(1) = name;
 
-    auto gender = std::make_shared<DingoSchema<optional<shared_ptr<string>>>>();
+    auto gender = std::make_shared<DingoSchema<std::string>>();
     gender->SetIndex(2);
     gender->SetAllowNull(false);
     gender->SetIsKey(true);
-    schemas_->at(2) = gender;
+    schemas_.at(2) = gender;
 
-    auto score = std::make_shared<DingoSchema<optional<int64_t>>>();
+    auto score = std::make_shared<DingoSchema<int64_t>>();
     score->SetIndex(3);
     score->SetAllowNull(false);
     score->SetIsKey(true);
-    schemas_->at(3) = score;
+    schemas_.at(3) = score;
 
-    auto addr = std::make_shared<DingoSchema<optional<shared_ptr<string>>>>();
+    auto addr = std::make_shared<DingoSchema<std::string>>();
     addr->SetIndex(4);
     addr->SetAllowNull(true);
     addr->SetIsKey(false);
-    schemas_->at(4) = addr;
+    schemas_.at(4) = addr;
 
-    auto exist = std::make_shared<DingoSchema<optional<bool>>>();
+    auto exist = std::make_shared<DingoSchema<bool>>();
     exist->SetIndex(5);
     exist->SetAllowNull(false);
     exist->SetIsKey(false);
-    schemas_->at(5) = exist;
+    schemas_.at(5) = exist;
 
-    auto pic = std::make_shared<DingoSchema<optional<shared_ptr<string>>>>();
+    auto pic = std::make_shared<DingoSchema<std::string>>();
     pic->SetIndex(6);
     pic->SetAllowNull(true);
     pic->SetIsKey(false);
-    schemas_->at(6) = pic;
+    schemas_.at(6) = pic;
 
-    auto test_null = std::make_shared<DingoSchema<optional<int32_t>>>();
+    auto test_null = std::make_shared<DingoSchema<int32_t>>();
     test_null->SetIndex(7);
     test_null->SetAllowNull(true);
     test_null->SetIsKey(false);
-    schemas_->at(7) = test_null;
+    schemas_.at(7) = test_null;
 
-    auto age = std::make_shared<DingoSchema<optional<int32_t>>>();
+    auto age = std::make_shared<DingoSchema<int32_t>>();
     age->SetIndex(8);
     age->SetAllowNull(false);
     age->SetIsKey(false);
-    schemas_->at(8) = age;
+    schemas_.at(8) = age;
 
-    auto prev = std::make_shared<DingoSchema<optional<int64_t>>>();
+    auto prev = std::make_shared<DingoSchema<int64_t>>();
     prev->SetIndex(9);
     prev->SetAllowNull(false);
     prev->SetIsKey(false);
-    schemas_->at(9) = prev;
+    schemas_.at(9) = prev;
 
-    auto salary = std::make_shared<DingoSchema<optional<double>>>();
+    auto salary = std::make_shared<DingoSchema<double>>();
     salary->SetIndex(10);
     salary->SetAllowNull(true);
     salary->SetIsKey(false);
-    schemas_->at(10) = salary;
+    schemas_.at(10) = salary;
   }
 
   void DeleteSchemas() {
-    schemas_->clear();
-    schemas_->shrink_to_fit();
+    schemas_.clear();
+    schemas_.shrink_to_fit();
   }
 
   void InitRecord() {
-    record_ = new vector<any>(11);
-    optional<int32_t> id = 0;
-    std::shared_ptr<std::string> name = std::make_shared<std::string>("tn");
-    std::shared_ptr<std::string> gender = std::make_shared<std::string>("f");
-    optional<int64_t> score = 214748364700L;
-    std::shared_ptr<std::string> addr = std::make_shared<std::string>(
+    record_.resize(11);
+
+    int32_t id = 0;
+    std::string name = "tn";
+    std::string gender = "f";
+    int64_t score = 214748364700L;
+    std::string addr =
         "test address test 中文 表情😊🏷️👌 test "
         "测试测试测试三🤣😂😁🐱‍🐉👏🐱‍💻✔🤳🤦‍♂️🤦‍♀️🙌测试测试"
         "测"
-        "试伍佰肆拾陆万伍仟陆佰伍拾肆元/n/r/r/ndfs肥肉士大夫");
-    optional<bool> exist = false;
-    optional<shared_ptr<string>> pic = nullopt;
-    optional<int32_t> test_null = nullopt;
-    optional<int32_t> age = -20;
-    optional<int64_t> prev = -214748364700L;
-    optional<double> salary = 873485.4234;
+        "试伍佰肆拾陆万伍仟陆佰伍拾肆元/n/r/r/ndfs肥肉士大夫";
+    bool exist = false;
 
-    record_->at(0) = id;
-    record_->at(1) = optional<shared_ptr<string>>{name};
-    record_->at(2) = optional<shared_ptr<string>>{gender};
-    record_->at(3) = score;
-    record_->at(4) = optional<shared_ptr<string>>{addr};
-    record_->at(5) = exist;
-    record_->at(6) = pic;
-    record_->at(7) = test_null;
-    record_->at(8) = age;
-    record_->at(9) = prev;
-    record_->at(10) = salary;
+    int32_t age = -20;
+    int64_t prev = -214748364700L;
+    double salary = 873485.4234;
+
+    record_.at(0) = id;
+    record_.at(1) = name;
+    record_.at(2) = gender;
+    record_.at(3) = score;
+    record_.at(4) = addr;
+    record_.at(5) = exist;
+    record_.at(8) = age;
+    record_.at(9) = prev;
+    record_.at(10) = salary;
   }
-  void DeleteRecords() const {
-    optional<shared_ptr<string>> name = any_cast<optional<shared_ptr<string>>>(record_->at(1));
-    if (name.has_value()) {
-    }
-    optional<shared_ptr<string>> gender = any_cast<optional<shared_ptr<string>>>(record_->at(2));
-    if (gender.has_value()) {
-    }
-    optional<shared_ptr<string>> addr = any_cast<optional<shared_ptr<string>>>(record_->at(4));
-    if (addr.has_value()) {
-    }
-    record_->clear();
-    record_->shrink_to_fit();
+
+  void DeleteRecords() {
+    record_.clear();
+    record_.shrink_to_fit();
   }
-  std::shared_ptr<vector<std::shared_ptr<BaseSchema>>> GetSchemas() const { return schemas_; }
-  vector<any>* GetRecord() const { return record_; }
+
+  const std::vector<BaseSchemaPtr>& GetSchemas() const { return schemas_; }
+  const std::vector<std::any>& GetRecord() const { return record_; }
 
  protected:
   bool le = IsLE();
   void SetUp() override {}
   void TearDown() override {}
+
+ private:
+  std::vector<BaseSchemaPtr> schemas_;
+  std::vector<std::any> record_;
 };
 
 TEST_F(DingoSerialTest, boolSchema) {
-  DingoSchema<optional<bool>> b1;
-  b1.SetIndex(0);
-  b1.SetAllowNull(false);
-  b1.SetIsKey(true);
-  optional<bool> data1 = false;
-  Buf* bf1 = new Buf(1, this->le);
-  b1.EncodeKey(bf1, data1);
-  string* bs1 = bf1->GetBytes();
-  Buf* bf2 = new Buf(bs1, this->le);
-  delete bs1;
-  optional<bool> data2 = b1.DecodeKey(bf2);
-  delete bf1;
-  delete bf2;
-  if (data2.has_value()) {
-    EXPECT_EQ(data1, data2.value());
-  } else {
-    EXPECT_TRUE(0);
+  {
+    DingoSchema<bool> schema;
+    schema.SetIndex(0);
+    schema.SetAllowNull(false);
+    schema.SetIsKey(true);
+    bool data = false;
+    Buf encode_buf(1, this->le);
+    schema.EncodeKey(data, encode_buf);
+
+    Buf decode_buf(encode_buf.GetString(), this->le);
+    auto decode_data = schema.DecodeKey(decode_buf);
+    ASSERT_TRUE(decode_data.has_value());
+    EXPECT_EQ(data, std::any_cast<bool>(decode_data));
   }
 
-  DingoSchema<optional<bool>> b2;
-  b2.SetIndex(0);
-  b2.SetAllowNull(true);
-  b2.SetIsKey(false);
-  optional<bool> data3 = true;
-  Buf* bf3 = new Buf(1, this->le);
-  b2.EncodeValue(bf3, data3);
-  string* bs2 = bf3->GetBytes();
-  Buf* bf4 = new Buf(bs2, this->le);
-  delete bs2;
-  optional<bool> data4 = b2.DecodeValue(bf4);
-  delete bf3;
-  delete bf4;
-  if (data4.has_value()) {
-    EXPECT_EQ(data3, data4.value());
-  } else {
-    EXPECT_TRUE(0);
+  {
+    DingoSchema<bool> schema;
+    schema.SetIndex(0);
+    schema.SetAllowNull(true);
+    schema.SetIsKey(false);
+    bool data = true;
+    Buf encode_buf(1, this->le);
+    schema.EncodeValue(data, encode_buf);
+    Buf decode_buf(encode_buf.GetString(), this->le);
+    auto decode_data = schema.DecodeValue(decode_buf);
+    ASSERT_TRUE(decode_data.has_value());
+    EXPECT_EQ(data, std::any_cast<bool>(decode_data));
   }
 
-  optional<bool> data5 = nullopt;
-  Buf* bf5 = new Buf(1, this->le);
-  b2.EncodeValue(bf5, data5);
-  string* bs3 = bf5->GetBytes();
-  Buf* bf6 = new Buf(bs3, this->le);
-  delete bs3;
-  optional<bool> data6 = b2.DecodeValue(bf6);
-  delete bf5;
-  delete bf6;
-  EXPECT_FALSE(data6.has_value());
+  {
+    DingoSchema<bool> schema;
+    schema.SetIndex(0);
+    schema.SetAllowNull(true);
+    schema.SetIsKey(false);
 
-  DingoSchema<optional<bool>> b3;
-  b3.SetIndex(0);
-  b3.SetAllowNull(true);
-  b3.SetIsKey(true);
-  Buf* bf7 = new Buf(100, this->le);
-  b3.EncodeValue(bf7, nullopt);
-  string* bs4 = bf7->GetBytes();
-  Buf* bf8 = new Buf(bs4, this->le);
-  delete bs4;
-  EXPECT_FALSE(b3.DecodeKey(bf8).has_value());
-  delete bf7;
-  delete bf8;
+    Buf encode_buf(1, this->le);
+    schema.EncodeValue(std::any(), encode_buf);
+    Buf decode_buf(encode_buf.GetString(), this->le);
+    auto decode_data = schema.DecodeValue(decode_buf);
+    EXPECT_FALSE(decode_data.has_value());
+  }
+
+  {
+    DingoSchema<bool> schema;
+    schema.SetIndex(0);
+    schema.SetAllowNull(true);
+    schema.SetIsKey(true);
+    Buf encode_buf(100, this->le);
+    schema.EncodeValue(std::any(), encode_buf);
+    Buf decode_buf(encode_buf.GetString(), this->le);
+    EXPECT_FALSE(schema.DecodeKey(decode_buf).has_value());
+  }
 }
 
 TEST_F(DingoSerialTest, integerSchema) {
-  DingoSchema<optional<int32_t>> b1;
-  b1.SetIndex(0);
-  b1.SetAllowNull(false);
-  b1.SetIsKey(true);
-  optional<int32_t> data1 = 1543234;
-  Buf* bf1 = new Buf(1, this->le);
-  b1.EncodeKey(bf1, data1);
-  string* bs1 = bf1->GetBytes();
-  Buf* bf2 = new Buf(bs1, this->le);
-  delete bs1;
-  optional<int32_t> data2 = b1.DecodeKey(bf2);
-  delete bf1;
-  delete bf2;
-  if (data2.has_value()) {
-    EXPECT_EQ(data1, data2.value());
-  } else {
-    EXPECT_TRUE(0);
+  {
+    DingoSchema<int32_t> schema;
+    schema.SetIndex(0);
+    schema.SetAllowNull(false);
+    schema.SetIsKey(true);
+    int32_t data = 1543234;
+    Buf encode_buf(1, this->le);
+    schema.EncodeKey(data, encode_buf);
+    Buf decode_buf(encode_buf.GetString(), this->le);
+    auto decode_data = schema.DecodeKey(decode_buf);
+    ASSERT_TRUE(decode_data.has_value());
+    EXPECT_EQ(data, std::any_cast<int32_t>(decode_data));
   }
 
-  DingoSchema<optional<int32_t>> b2;
-  b2.SetIndex(0);
-  b2.SetAllowNull(true);
-  b2.SetIsKey(false);
-  optional<int32_t> data3 = 532142;
-  Buf* bf3 = new Buf(1, this->le);
-  b2.EncodeValue(bf3, data3);
-  string* bs2 = bf3->GetBytes();
-  Buf* bf4 = new Buf(bs2, this->le);
-  delete bs2;
-  optional<int32_t> data4 = b2.DecodeValue(bf4);
-  delete bf3;
-  delete bf4;
-  if (data4.has_value()) {
-    EXPECT_EQ(data3, data4.value());
-  } else {
-    EXPECT_TRUE(0);
+  {
+    DingoSchema<int32_t> schema;
+    schema.SetIndex(0);
+    schema.SetAllowNull(true);
+    schema.SetIsKey(false);
+    int32_t data = 532142;
+    Buf encode_buf(1, this->le);
+    schema.EncodeValue(data, encode_buf);
+    Buf decode_buf(encode_buf.GetString(), this->le);
+    auto decode_data = schema.DecodeValue(decode_buf);
+
+    ASSERT_TRUE(decode_data.has_value());
+    EXPECT_EQ(data, std::any_cast<int32_t>(decode_data));
   }
 
-  optional<int32_t> data5 = nullopt;
-  Buf* bf5 = new Buf(1, this->le);
-  b2.EncodeValue(bf5, data5);
-  string* bs3 = bf5->GetBytes();
-  Buf* bf6 = new Buf(bs3, this->le);
-  delete bs3;
-  optional<int32_t> data6 = b2.DecodeValue(bf6);
-  delete bf5;
-  delete bf6;
-  EXPECT_FALSE(data6.has_value());
+  {
+    DingoSchema<int32_t> schema;
+    schema.SetIndex(0);
+    schema.SetAllowNull(true);
+    schema.SetIsKey(false);
 
-  DingoSchema<optional<int32_t>> b3;
-  b3.SetIndex(0);
-  b3.SetAllowNull(true);
-  b3.SetIsKey(true);
-  Buf* bf7 = new Buf(100, this->le);
-  b3.EncodeValue(bf7, nullopt);
-  string* bs4 = bf7->GetBytes();
-  Buf* bf8 = new Buf(bs4, this->le);
-  delete bs4;
-  EXPECT_FALSE(b3.DecodeKey(bf8).has_value());
-  delete bf7;
-  delete bf8;
+    Buf encode_buf(1, this->le);
+    schema.EncodeValue(std::any(), encode_buf);
+    Buf decode_buf(encode_buf.GetString(), this->le);
+    auto decode_data = schema.DecodeValue(decode_buf);
+    EXPECT_FALSE(decode_data.has_value());
+  }
+
+  {
+    DingoSchema<int32_t> schema;
+    schema.SetIndex(0);
+    schema.SetAllowNull(true);
+    schema.SetIsKey(true);
+    Buf encode_buf(100, this->le);
+    schema.EncodeValue(std::any(), encode_buf);
+    Buf decode_buf(encode_buf.GetString(), this->le);
+    EXPECT_FALSE(schema.DecodeKey(decode_buf).has_value());
+  }
 }
 
 TEST_F(DingoSerialTest, integerSchemaLeBe) {
   uint32_t data = 1543234;
   // bitset<32> key_data("10000000000101111000110001000010");
-  bitset<8> key_data_0("10000000");
-  bitset<8> key_data_1("00010111");
-  bitset<8> key_data_2("10001100");
-  bitset<8> key_data_3("01000010");
+  std::bitset<8> key_data_0("10000000");
+  std::bitset<8> key_data_1("00010111");
+  std::bitset<8> key_data_2("10001100");
+  std::bitset<8> key_data_3("01000010");
   // bitset<32> value_data("00000000000101111000110001000010");
-  bitset<8> value_data_0("00000000");
-  bitset<8> value_data_1("00010111");
-  bitset<8> value_data_2("10001100");
-  bitset<8> value_data_3("01000010");
-  bitset<8> not_null_tag("00000001");
+  std::bitset<8> value_data_0("00000000");
+  std::bitset<8> value_data_1("00010111");
+  std::bitset<8> value_data_2("10001100");
+  std::bitset<8> value_data_3("01000010");
+  std::bitset<8> not_null_tag("00000001");
 
-  DingoSchema<optional<int32_t>> b1;
-  b1.SetIndex(0);
-  optional<int32_t> data1 = data;
+  DingoSchema<int32_t> schema;
+  schema.SetIndex(0);
+  int32_t data1 = data;
 
-  b1.SetAllowNull(true);
-  b1.SetIsKey(true);
+  schema.SetAllowNull(true);
+  schema.SetIsKey(true);
   if (this->le) {
-    b1.SetIsLe(true);
+    schema.SetIsLe(true);
   } else {
-    b1.SetIsLe(false);
+    schema.SetIsLe(false);
   }
-  Buf* bf1 = new Buf(1, this->le);
-  b1.EncodeKey(bf1, data1);
-  string* bs1 = bf1->GetBytes();
-  bitset<8> bs10(bs1->at(0));
-  EXPECT_EQ(bs10, not_null_tag);
-  bitset<8> bs11(bs1->at(1));
-  EXPECT_EQ(bs11, key_data_0);
-  bitset<8> bs12(bs1->at(2));
-  EXPECT_EQ(bs12, key_data_1);
-  bitset<8> bs13(bs1->at(3));
-  EXPECT_EQ(bs13, key_data_2);
-  bitset<8> bs14(bs1->at(4));
-  EXPECT_EQ(bs14, key_data_3);
-  Buf* bf11 = new Buf(bs1, this->le);
-  optional<int32_t> data2 = b1.DecodeKey(bf11);
-  EXPECT_EQ(data1, data2);
-  delete bs1;
-  delete bf1;
-  delete bf11;
+  {
+    Buf encode_buf(1, this->le);
+    schema.EncodeKey(data1, encode_buf);
+    std::string bs1 = encode_buf.GetString();
+    std::bitset<8> bs10(bs1.at(0));
+    EXPECT_EQ(bs10, not_null_tag);
+    std::bitset<8> bs11(bs1.at(1));
+    EXPECT_EQ(bs11, key_data_0);
+    std::bitset<8> bs12(bs1.at(2));
+    EXPECT_EQ(bs12, key_data_1);
+    std::bitset<8> bs13(bs1.at(3));
+    EXPECT_EQ(bs13, key_data_2);
+    std::bitset<8> bs14(bs1.at(4));
+    EXPECT_EQ(bs14, key_data_3);
+    Buf decode_buf(bs1, this->le);
+    auto decode_data = schema.DecodeKey(decode_buf);
+    EXPECT_EQ(data1, std::any_cast<int32_t>(decode_data));
+  }
 
-  b1.SetIsKey(false);
-  Buf* bf2 = new Buf(1, this->le);
-  b1.EncodeValue(bf2, data1);
-  string* bs2 = bf2->GetBytes();
-  bitset<8> bs20(bs2->at(0));
-  EXPECT_EQ(bs20, not_null_tag);
-  bitset<8> bs21(bs2->at(1));
-  EXPECT_EQ(bs21, value_data_0);
-  bitset<8> bs22(bs2->at(2));
-  EXPECT_EQ(bs22, value_data_1);
-  bitset<8> bs23(bs2->at(3));
-  EXPECT_EQ(bs23, value_data_2);
-  bitset<8> bs24(bs2->at(4));
-  EXPECT_EQ(bs24, value_data_3);
-  Buf* bf21 = new Buf(bs2, this->le);
-  optional<int32_t> data3 = b1.DecodeValue(bf21);
-  EXPECT_EQ(data1, data3);
-  delete bs2;
-  delete bf2;
-  delete bf21;
+  {
+    schema.SetIsKey(false);
+    Buf encode_buf(1, this->le);
+    schema.EncodeValue(data1, encode_buf);
+    std::string bs2 = encode_buf.GetString();
+    std::bitset<8> bs20(bs2.at(0));
+    EXPECT_EQ(bs20, not_null_tag);
+    std::bitset<8> bs21(bs2.at(1));
+    EXPECT_EQ(bs21, value_data_0);
+    std::bitset<8> bs22(bs2.at(2));
+    EXPECT_EQ(bs22, value_data_1);
+    std::bitset<8> bs23(bs2.at(3));
+    EXPECT_EQ(bs23, value_data_2);
+    std::bitset<8> bs24(bs2.at(4));
+    EXPECT_EQ(bs24, value_data_3);
+    Buf decode_buf(bs2, this->le);
+    auto decode_data = schema.DecodeValue(decode_buf);
+    EXPECT_EQ(data1, std::any_cast<int32_t>(decode_data));
+  }
 }
 
 TEST_F(DingoSerialTest, integerSchemaFakeLeBe) {
   uint32_t data = bswap_32(1543234);
   // bitset<32> key_data("10000000000101111000110001000010");
-  bitset<8> key_data_0("10000000");
-  bitset<8> key_data_1("00010111");
-  bitset<8> key_data_2("10001100");
-  bitset<8> key_data_3("01000010");
+  std::bitset<8> key_data_0("10000000");
+  std::bitset<8> key_data_1("00010111");
+  std::bitset<8> key_data_2("10001100");
+  std::bitset<8> key_data_3("01000010");
   // bitset<32> value_data("00000000000101111000110001000010");
-  bitset<8> value_data_0("00000000");
-  bitset<8> value_data_1("00010111");
-  bitset<8> value_data_2("10001100");
-  bitset<8> value_data_3("01000010");
-  bitset<8> not_null_tag("00000001");
+  std::bitset<8> value_data_0("00000000");
+  std::bitset<8> value_data_1("00010111");
+  std::bitset<8> value_data_2("10001100");
+  std::bitset<8> value_data_3("01000010");
+  std::bitset<8> not_null_tag("00000001");
 
-  DingoSchema<optional<int32_t>> b1;
-  b1.SetIndex(0);
-  optional<int32_t> data1 = data;
+  DingoSchema<int32_t> schema;
+  schema.SetIndex(0);
+  int32_t data1 = data;
 
-  b1.SetAllowNull(true);
-  b1.SetIsKey(true);
+  schema.SetAllowNull(true);
+  schema.SetIsKey(true);
   if (!this->le) {
-    b1.SetIsLe(true);
+    schema.SetIsLe(true);
   } else {
-    b1.SetIsLe(false);
+    schema.SetIsLe(false);
   }
-  Buf* bf1 = new Buf(1, !this->le);
-  b1.EncodeKey(bf1, data1);
-  string* bs1 = bf1->GetBytes();
-  bitset<8> bs10(bs1->at(0));
-  EXPECT_EQ(bs10, not_null_tag);
-  bitset<8> bs11(bs1->at(1));
-  EXPECT_EQ(bs11, key_data_0);
-  bitset<8> bs12(bs1->at(2));
-  EXPECT_EQ(bs12, key_data_1);
-  bitset<8> bs13(bs1->at(3));
-  EXPECT_EQ(bs13, key_data_2);
-  bitset<8> bs14(bs1->at(4));
-  EXPECT_EQ(bs14, key_data_3);
-  Buf* bf11 = new Buf(bs1, !this->le);
-  optional<int32_t> data2 = b1.DecodeKey(bf11);
-  EXPECT_EQ(data1, data2);
-  delete bs1;
-  delete bf1;
-  delete bf11;
+  {
+    Buf encode_buf(1, !this->le);
+    schema.EncodeKey(data1, encode_buf);
+    std::string bs1 = encode_buf.GetString();
+    std::bitset<8> bs10(bs1.at(0));
+    EXPECT_EQ(bs10, not_null_tag);
+    std::bitset<8> bs11(bs1.at(1));
+    EXPECT_EQ(bs11, key_data_0);
+    std::bitset<8> bs12(bs1.at(2));
+    EXPECT_EQ(bs12, key_data_1);
+    std::bitset<8> bs13(bs1.at(3));
+    EXPECT_EQ(bs13, key_data_2);
+    std::bitset<8> bs14(bs1.at(4));
+    EXPECT_EQ(bs14, key_data_3);
+    Buf decode_buf(bs1, !this->le);
+    auto decode_data = schema.DecodeKey(decode_buf);
+    EXPECT_EQ(data1, std::any_cast<int32_t>(decode_data));
+  }
 
-  b1.SetIsKey(false);
-  Buf* bf2 = new Buf(1, !this->le);
-  b1.EncodeValue(bf2, data1);
-  string* bs2 = bf2->GetBytes();
-  bitset<8> bs20(bs2->at(0));
-  EXPECT_EQ(bs20, not_null_tag);
-  bitset<8> bs21(bs2->at(1));
-  EXPECT_EQ(bs21, value_data_0);
-  bitset<8> bs22(bs2->at(2));
-  EXPECT_EQ(bs22, value_data_1);
-  bitset<8> bs23(bs2->at(3));
-  EXPECT_EQ(bs23, value_data_2);
-  bitset<8> bs24(bs2->at(4));
-  EXPECT_EQ(bs24, value_data_3);
-  Buf* bf21 = new Buf(bs2, !this->le);
-  optional<int32_t> data3 = b1.DecodeValue(bf21);
-  EXPECT_EQ(data1, data3);
-  delete bs2;
-  delete bf2;
-  delete bf21;
+  {
+    schema.SetIsKey(false);
+    Buf encode_buf(1, !this->le);
+    schema.EncodeValue(data1, encode_buf);
+    std::string bs2 = encode_buf.GetString();
+    std::bitset<8> bs20(bs2.at(0));
+    EXPECT_EQ(bs20, not_null_tag);
+    std::bitset<8> bs21(bs2.at(1));
+    EXPECT_EQ(bs21, value_data_0);
+    std::bitset<8> bs22(bs2.at(2));
+    EXPECT_EQ(bs22, value_data_1);
+    std::bitset<8> bs23(bs2.at(3));
+    EXPECT_EQ(bs23, value_data_2);
+    std::bitset<8> bs24(bs2.at(4));
+    EXPECT_EQ(bs24, value_data_3);
+    Buf decode_buf(bs2, !this->le);
+    auto decode_data = schema.DecodeValue(decode_buf);
+    EXPECT_EQ(data1, std::any_cast<int32_t>(decode_data));
+  }
 }
 
 TEST_F(DingoSerialTest, floatSchemaLeBe) {
   float data = -43225.23;
   // bitset<32> key_data("00111000110101110010011011000100");
-  bitset<8> key_data_0("00111000");
-  bitset<8> key_data_1("11010111");
-  bitset<8> key_data_2("00100110");
-  bitset<8> key_data_3("11000100");
+  std::bitset<8> key_data_0("00111000");
+  std::bitset<8> key_data_1("11010111");
+  std::bitset<8> key_data_2("00100110");
+  std::bitset<8> key_data_3("11000100");
   // bitset<32> value_data("11000111001010001101100100111011");
-  bitset<8> value_data_0("11000111");
-  bitset<8> value_data_1("00101000");
-  bitset<8> value_data_2("11011001");
-  bitset<8> value_data_3("00111011");
-  bitset<8> not_null_tag("00000001");
+  std::bitset<8> value_data_0("11000111");
+  std::bitset<8> value_data_1("00101000");
+  std::bitset<8> value_data_2("11011001");
+  std::bitset<8> value_data_3("00111011");
+  std::bitset<8> not_null_tag("00000001");
 
-  DingoSchema<optional<float>> b1;
-  b1.SetIndex(0);
-  optional<float> data1 = data;
+  DingoSchema<float> schema;
+  schema.SetIndex(0);
+  float data1 = data;
 
-  b1.SetAllowNull(true);
-  b1.SetIsKey(true);
+  schema.SetAllowNull(true);
+  schema.SetIsKey(true);
   if (this->le) {
-    b1.SetIsLe(true);
+    schema.SetIsLe(true);
   } else {
-    b1.SetIsLe(false);
+    schema.SetIsLe(false);
   }
-  Buf* bf1 = new Buf(1, this->le);
-  b1.EncodeKey(bf1, data1);
-  string* bs1 = bf1->GetBytes();
-  bitset<8> bs10(bs1->at(0));
-  EXPECT_EQ(bs10, not_null_tag);
-  bitset<8> bs11(bs1->at(1));
-  EXPECT_EQ(bs11, key_data_0);
-  bitset<8> bs12(bs1->at(2));
-  EXPECT_EQ(bs12, key_data_1);
-  bitset<8> bs13(bs1->at(3));
-  EXPECT_EQ(bs13, key_data_2);
-  bitset<8> bs14(bs1->at(4));
-  EXPECT_EQ(bs14, key_data_3);
-  Buf* bf11 = new Buf(bs1, this->le);
-  optional<float> data2 = b1.DecodeKey(bf11);
-  EXPECT_EQ(data1, data2);
-  delete bs1;
-  delete bf1;
-  delete bf11;
 
-  b1.SetIsKey(false);
-  Buf* bf2 = new Buf(1, this->le);
-  b1.EncodeValue(bf2, data1);
-  string* bs2 = bf2->GetBytes();
-  bitset<8> bs20(bs2->at(0));
-  EXPECT_EQ(bs20, not_null_tag);
-  bitset<8> bs21(bs2->at(1));
-  EXPECT_EQ(bs21, value_data_0);
-  bitset<8> bs22(bs2->at(2));
-  EXPECT_EQ(bs22, value_data_1);
-  bitset<8> bs23(bs2->at(3));
-  EXPECT_EQ(bs23, value_data_2);
-  bitset<8> bs24(bs2->at(4));
-  EXPECT_EQ(bs24, value_data_3);
-  Buf* bf21 = new Buf(bs2, this->le);
-  optional<float> data3 = b1.DecodeValue(bf21);
-  EXPECT_EQ(data1, data3);
-  delete bs2;
-  delete bf2;
-  delete bf21;
+  {
+    Buf encode_buf(1, this->le);
+    schema.EncodeKey(data1, encode_buf);
+    std::string bs1 = encode_buf.GetString();
+    std::bitset<8> bs10(bs1.at(0));
+    EXPECT_EQ(bs10, not_null_tag);
+    std::bitset<8> bs11(bs1.at(1));
+    EXPECT_EQ(bs11, key_data_0);
+    std::bitset<8> bs12(bs1.at(2));
+    EXPECT_EQ(bs12, key_data_1);
+    std::bitset<8> bs13(bs1.at(3));
+    EXPECT_EQ(bs13, key_data_2);
+    std::bitset<8> bs14(bs1.at(4));
+    EXPECT_EQ(bs14, key_data_3);
+    Buf decode_buf(bs1, this->le);
+    auto decode_data = schema.DecodeKey(decode_buf);
+    EXPECT_EQ(data1, std::any_cast<float>(decode_data));
+  }
+
+  {
+    schema.SetIsKey(false);
+    Buf encode_buf(1, this->le);
+    schema.EncodeValue(data1, encode_buf);
+    std::string bs2 = encode_buf.GetString();
+    std::bitset<8> bs20(bs2.at(0));
+    EXPECT_EQ(bs20, not_null_tag);
+    std::bitset<8> bs21(bs2.at(1));
+    EXPECT_EQ(bs21, value_data_0);
+    std::bitset<8> bs22(bs2.at(2));
+    EXPECT_EQ(bs22, value_data_1);
+    std::bitset<8> bs23(bs2.at(3));
+    EXPECT_EQ(bs23, value_data_2);
+    std::bitset<8> bs24(bs2.at(4));
+    EXPECT_EQ(bs24, value_data_3);
+    Buf decode_buf(bs2, this->le);
+    auto decode_data = schema.DecodeValue(decode_buf);
+    EXPECT_EQ(data1, std::any_cast<float>(decode_data));
+  }
 }
 
 TEST_F(DingoSerialTest, floatSchemaFakeLeBe) {
@@ -500,341 +470,337 @@ TEST_F(DingoSerialTest, floatSchemaFakeLeBe) {
   float data;
   memcpy(&data, &data_bits, 4);
   // bitset<32> key_data("00111000110101110010011011000100");
-  bitset<8> key_data_0("00111000");
-  bitset<8> key_data_1("11010111");
-  bitset<8> key_data_2("00100110");
-  bitset<8> key_data_3("01110111");
+  std::bitset<8> key_data_0("00111000");
+  std::bitset<8> key_data_1("11010111");
+  std::bitset<8> key_data_2("00100110");
+  std::bitset<8> key_data_3("01110111");
   // bitset<32> value_data("11000111001010001101100110001000");
-  bitset<8> value_data_0("11000111");
-  bitset<8> value_data_1("00101000");
-  bitset<8> value_data_2("11011001");
-  bitset<8> value_data_3("10001000");
-  bitset<8> not_null_tag("00000001");
+  std::bitset<8> value_data_0("11000111");
+  std::bitset<8> value_data_1("00101000");
+  std::bitset<8> value_data_2("11011001");
+  std::bitset<8> value_data_3("10001000");
+  std::bitset<8> not_null_tag("00000001");
 
-  DingoSchema<optional<float>> b1;
-  b1.SetIndex(0);
-  optional<float> data1 = data;
+  DingoSchema<float> schema;
+  schema.SetIndex(0);
+  float data1 = data;
 
-  b1.SetAllowNull(true);
-  b1.SetIsKey(true);
+  schema.SetAllowNull(true);
+  schema.SetIsKey(true);
   if (!this->le) {
-    b1.SetIsLe(true);
+    schema.SetIsLe(true);
   } else {
-    b1.SetIsLe(false);
+    schema.SetIsLe(false);
   }
-  Buf* bf1 = new Buf(1, !this->le);
-  b1.EncodeKey(bf1, data1);
-  string* bs1 = bf1->GetBytes();
-  bitset<8> bs10(bs1->at(0));
-  EXPECT_EQ(bs10, not_null_tag);
-  bitset<8> bs11(bs1->at(1));
-  EXPECT_EQ(bs11, key_data_0);
-  bitset<8> bs12(bs1->at(2));
-  EXPECT_EQ(bs12, key_data_1);
-  bitset<8> bs13(bs1->at(3));
-  EXPECT_EQ(bs13, key_data_2);
-  bitset<8> bs14(bs1->at(4));
-  EXPECT_EQ(bs14, key_data_3);
-  Buf* bf11 = new Buf(bs1, !this->le);
-  optional<float> data2 = b1.DecodeKey(bf11);
-  EXPECT_EQ(data1, data2);
-  delete bs1;
-  delete bf1;
-  delete bf11;
 
-  b1.SetIsKey(false);
-  Buf* bf2 = new Buf(1, !this->le);
-  b1.EncodeValue(bf2, data1);
-  string* bs2 = bf2->GetBytes();
-  bitset<8> bs20(bs2->at(0));
-  EXPECT_EQ(bs20, not_null_tag);
-  bitset<8> bs21(bs2->at(1));
-  EXPECT_EQ(bs21, value_data_0);
-  bitset<8> bs22(bs2->at(2));
-  EXPECT_EQ(bs22, value_data_1);
-  bitset<8> bs23(bs2->at(3));
-  EXPECT_EQ(bs23, value_data_2);
-  bitset<8> bs24(bs2->at(4));
-  EXPECT_EQ(bs24, value_data_3);
-  Buf* bf21 = new Buf(bs2, !this->le);
-  optional<float> data3 = b1.DecodeValue(bf21);
-  EXPECT_EQ(data1, data3);
-  delete bs2;
-  delete bf2;
-  delete bf21;
+  {
+    Buf encode_buf(1, !this->le);
+    schema.EncodeKey(data1, encode_buf);
+    std::string bs1 = encode_buf.GetString();
+    std::bitset<8> bs10(bs1.at(0));
+    EXPECT_EQ(bs10, not_null_tag);
+    std::bitset<8> bs11(bs1.at(1));
+    EXPECT_EQ(bs11, key_data_0);
+    std::bitset<8> bs12(bs1.at(2));
+    EXPECT_EQ(bs12, key_data_1);
+    std::bitset<8> bs13(bs1.at(3));
+    EXPECT_EQ(bs13, key_data_2);
+    std::bitset<8> bs14(bs1.at(4));
+    EXPECT_EQ(bs14, key_data_3);
+    Buf decode_buf(bs1, !this->le);
+    auto decode_data = schema.DecodeKey(decode_buf);
+    EXPECT_EQ(data1, std::any_cast<float>(decode_data));
+  }
+
+  {
+    schema.SetIsKey(false);
+    Buf encode_buf(1, !this->le);
+    schema.EncodeValue(data1, encode_buf);
+    std::string bs2 = encode_buf.GetString();
+    std::bitset<8> bs20(bs2.at(0));
+    EXPECT_EQ(bs20, not_null_tag);
+    std::bitset<8> bs21(bs2.at(1));
+    EXPECT_EQ(bs21, value_data_0);
+    std::bitset<8> bs22(bs2.at(2));
+    EXPECT_EQ(bs22, value_data_1);
+    std::bitset<8> bs23(bs2.at(3));
+    EXPECT_EQ(bs23, value_data_2);
+    std::bitset<8> bs24(bs2.at(4));
+    EXPECT_EQ(bs24, value_data_3);
+    Buf decode_buf(bs2, !this->le);
+    auto decode_data = schema.DecodeValue(decode_buf);
+    EXPECT_EQ(data1, std::any_cast<float>(decode_data));
+  }
 }
 
 TEST_F(DingoSerialTest, longSchemaLeBe) {
   uint64_t data = 8237583920453957801;
   // bitset<64> key_data("1111001001010001110001101110111001011010001000001011100010101001");
-  bitset<8> key_data_0("11110010");
-  bitset<8> key_data_1("01010001");
-  bitset<8> key_data_2("11000110");
-  bitset<8> key_data_3("11101110");
-  bitset<8> key_data_4("01011010");
-  bitset<8> key_data_5("00100000");
-  bitset<8> key_data_6("10111000");
-  bitset<8> key_data_7("10101001");
+  std::bitset<8> key_data_0("11110010");
+  std::bitset<8> key_data_1("01010001");
+  std::bitset<8> key_data_2("11000110");
+  std::bitset<8> key_data_3("11101110");
+  std::bitset<8> key_data_4("01011010");
+  std::bitset<8> key_data_5("00100000");
+  std::bitset<8> key_data_6("10111000");
+  std::bitset<8> key_data_7("10101001");
   // bitset<64> value_data("0111001001010001110001101110111001011010001000001011100010101001");
-  bitset<8> value_data_0("01110010");
-  bitset<8> value_data_1("01010001");
-  bitset<8> value_data_2("11000110");
-  bitset<8> value_data_3("11101110");
-  bitset<8> value_data_4("01011010");
-  bitset<8> value_data_5("00100000");
-  bitset<8> value_data_6("10111000");
-  bitset<8> value_data_7("10101001");
-  bitset<8> not_null_tag("00000001");
+  std::bitset<8> value_data_0("01110010");
+  std::bitset<8> value_data_1("01010001");
+  std::bitset<8> value_data_2("11000110");
+  std::bitset<8> value_data_3("11101110");
+  std::bitset<8> value_data_4("01011010");
+  std::bitset<8> value_data_5("00100000");
+  std::bitset<8> value_data_6("10111000");
+  std::bitset<8> value_data_7("10101001");
+  std::bitset<8> not_null_tag("00000001");
 
-  DingoSchema<optional<int64_t>> b1;
-  b1.SetIndex(0);
-  optional<int64_t> data1 = data;
+  DingoSchema<int64_t> schema;
+  schema.SetIndex(0);
+  int64_t data1 = data;
 
-  b1.SetAllowNull(true);
-  b1.SetIsKey(true);
+  schema.SetAllowNull(true);
+  schema.SetIsKey(true);
   if (this->le) {
-    b1.SetIsLe(true);
+    schema.SetIsLe(true);
   } else {
-    b1.SetIsLe(false);
+    schema.SetIsLe(false);
   }
-  Buf* bf1 = new Buf(1, this->le);
-  b1.EncodeKey(bf1, data1);
-  string* bs1 = bf1->GetBytes();
-  bitset<8> bs10(bs1->at(0));
-  EXPECT_EQ(bs10, not_null_tag);
-  bitset<8> bs11(bs1->at(1));
-  EXPECT_EQ(bs11, key_data_0);
-  bitset<8> bs12(bs1->at(2));
-  EXPECT_EQ(bs12, key_data_1);
-  bitset<8> bs13(bs1->at(3));
-  EXPECT_EQ(bs13, key_data_2);
-  bitset<8> bs14(bs1->at(4));
-  EXPECT_EQ(bs14, key_data_3);
-  bitset<8> bs15(bs1->at(5));
-  EXPECT_EQ(bs15, key_data_4);
-  bitset<8> bs16(bs1->at(6));
-  EXPECT_EQ(bs16, key_data_5);
-  bitset<8> bs17(bs1->at(7));
-  EXPECT_EQ(bs17, key_data_6);
-  bitset<8> bs18(bs1->at(8));
-  EXPECT_EQ(bs18, key_data_7);
-  Buf* bf11 = new Buf(bs1, this->le);
-  optional<int64_t> data2 = b1.DecodeKey(bf11);
-  EXPECT_EQ(data1, data2);
-  delete bs1;
-  delete bf1;
-  delete bf11;
 
-  b1.SetIsKey(false);
-  Buf* bf2 = new Buf(1, this->le);
-  b1.EncodeValue(bf2, data1);
-  string* bs2 = bf2->GetBytes();
-  bitset<8> bs20(bs2->at(0));
-  EXPECT_EQ(bs20, not_null_tag);
-  bitset<8> bs21(bs2->at(1));
-  EXPECT_EQ(bs21, value_data_0);
-  bitset<8> bs22(bs2->at(2));
-  EXPECT_EQ(bs22, value_data_1);
-  bitset<8> bs23(bs2->at(3));
-  EXPECT_EQ(bs23, value_data_2);
-  bitset<8> bs24(bs2->at(4));
-  EXPECT_EQ(bs24, value_data_3);
-  bitset<8> bs25(bs2->at(5));
-  EXPECT_EQ(bs25, value_data_4);
-  bitset<8> bs26(bs2->at(6));
-  EXPECT_EQ(bs26, value_data_5);
-  bitset<8> bs27(bs2->at(7));
-  EXPECT_EQ(bs27, value_data_6);
-  bitset<8> bs28(bs2->at(8));
-  EXPECT_EQ(bs28, value_data_7);
-  Buf* bf21 = new Buf(bs2, this->le);
-  optional<int64_t> data3 = b1.DecodeValue(bf21);
-  EXPECT_EQ(data1, data3);
-  delete bs2;
-  delete bf2;
-  delete bf21;
+  {
+    Buf encode_buf(1, this->le);
+    schema.EncodeKey(data1, encode_buf);
+    std::string bs1 = encode_buf.GetString();
+    std::bitset<8> bs10(bs1.at(0));
+    EXPECT_EQ(bs10, not_null_tag);
+    std::bitset<8> bs11(bs1.at(1));
+    EXPECT_EQ(bs11, key_data_0);
+    std::bitset<8> bs12(bs1.at(2));
+    EXPECT_EQ(bs12, key_data_1);
+    std::bitset<8> bs13(bs1.at(3));
+    EXPECT_EQ(bs13, key_data_2);
+    std::bitset<8> bs14(bs1.at(4));
+    EXPECT_EQ(bs14, key_data_3);
+    std::bitset<8> bs15(bs1.at(5));
+    EXPECT_EQ(bs15, key_data_4);
+    std::bitset<8> bs16(bs1.at(6));
+    EXPECT_EQ(bs16, key_data_5);
+    std::bitset<8> bs17(bs1.at(7));
+    EXPECT_EQ(bs17, key_data_6);
+    std::bitset<8> bs18(bs1.at(8));
+    EXPECT_EQ(bs18, key_data_7);
+    Buf decode_buf(bs1, this->le);
+    auto decode_data = schema.DecodeKey(decode_buf);
+    ASSERT_TRUE(decode_data.has_value());
+    ASSERT_EQ(data1, std::any_cast<int64_t>(decode_data));
+  }
+
+  {
+    schema.SetIsKey(false);
+    Buf encode_buf(1, this->le);
+    schema.EncodeValue(data1, encode_buf);
+    std::string bs2 = encode_buf.GetString();
+    std::bitset<8> bs20(bs2.at(0));
+    EXPECT_EQ(bs20, not_null_tag);
+    std::bitset<8> bs21(bs2.at(1));
+    EXPECT_EQ(bs21, value_data_0);
+    std::bitset<8> bs22(bs2.at(2));
+    EXPECT_EQ(bs22, value_data_1);
+    std::bitset<8> bs23(bs2.at(3));
+    EXPECT_EQ(bs23, value_data_2);
+    std::bitset<8> bs24(bs2.at(4));
+    EXPECT_EQ(bs24, value_data_3);
+    std::bitset<8> bs25(bs2.at(5));
+    EXPECT_EQ(bs25, value_data_4);
+    std::bitset<8> bs26(bs2.at(6));
+    EXPECT_EQ(bs26, value_data_5);
+    std::bitset<8> bs27(bs2.at(7));
+    EXPECT_EQ(bs27, value_data_6);
+    std::bitset<8> bs28(bs2.at(8));
+    EXPECT_EQ(bs28, value_data_7);
+    Buf decode_buf(bs2, this->le);
+    auto decode_data = schema.DecodeValue(decode_buf);
+    ASSERT_TRUE(decode_data.has_value());
+    ASSERT_EQ(data1, std::any_cast<int64_t>(decode_data));
+  }
 }
 
 TEST_F(DingoSerialTest, longSchemaFakeLeBe) {
   uint64_t data = bswap_64(8237583920453957801);
   // bitset<64> key_data("1111001001010001110001101110111001011010001000001011100010101001");
-  bitset<8> key_data_0("11110010");
-  bitset<8> key_data_1("01010001");
-  bitset<8> key_data_2("11000110");
-  bitset<8> key_data_3("11101110");
-  bitset<8> key_data_4("01011010");
-  bitset<8> key_data_5("00100000");
-  bitset<8> key_data_6("10111000");
-  bitset<8> key_data_7("10101001");
+  std::bitset<8> key_data_0("11110010");
+  std::bitset<8> key_data_1("01010001");
+  std::bitset<8> key_data_2("11000110");
+  std::bitset<8> key_data_3("11101110");
+  std::bitset<8> key_data_4("01011010");
+  std::bitset<8> key_data_5("00100000");
+  std::bitset<8> key_data_6("10111000");
+  std::bitset<8> key_data_7("10101001");
   // bitset<64> value_data("0111001001010001110001101110111001011010001000001011100010101001");
-  bitset<8> value_data_0("01110010");
-  bitset<8> value_data_1("01010001");
-  bitset<8> value_data_2("11000110");
-  bitset<8> value_data_3("11101110");
-  bitset<8> value_data_4("01011010");
-  bitset<8> value_data_5("00100000");
-  bitset<8> value_data_6("10111000");
-  bitset<8> value_data_7("10101001");
-  bitset<8> not_null_tag("00000001");
+  std::bitset<8> value_data_0("01110010");
+  std::bitset<8> value_data_1("01010001");
+  std::bitset<8> value_data_2("11000110");
+  std::bitset<8> value_data_3("11101110");
+  std::bitset<8> value_data_4("01011010");
+  std::bitset<8> value_data_5("00100000");
+  std::bitset<8> value_data_6("10111000");
+  std::bitset<8> value_data_7("10101001");
+  std::bitset<8> not_null_tag("00000001");
 
-  DingoSchema<optional<int64_t>> b1;
-  b1.SetIndex(0);
-  optional<int64_t> data1 = data;
+  DingoSchema<int64_t> schema;
+  schema.SetIndex(0);
+  int64_t data1 = data;
 
-  b1.SetAllowNull(true);
-  b1.SetIsKey(true);
+  schema.SetAllowNull(true);
+  schema.SetIsKey(true);
   if (!this->le) {
-    b1.SetIsLe(true);
+    schema.SetIsLe(true);
   } else {
-    b1.SetIsLe(false);
+    schema.SetIsLe(false);
   }
-  Buf* bf1 = new Buf(1, !this->le);
-  b1.EncodeKey(bf1, data1);
-  string* bs1 = bf1->GetBytes();
-  bitset<8> bs10(bs1->at(0));
-  EXPECT_EQ(bs10, not_null_tag);
-  bitset<8> bs11(bs1->at(1));
-  EXPECT_EQ(bs11, key_data_0);
-  bitset<8> bs12(bs1->at(2));
-  EXPECT_EQ(bs12, key_data_1);
-  bitset<8> bs13(bs1->at(3));
-  EXPECT_EQ(bs13, key_data_2);
-  bitset<8> bs14(bs1->at(4));
-  EXPECT_EQ(bs14, key_data_3);
-  bitset<8> bs15(bs1->at(5));
-  EXPECT_EQ(bs15, key_data_4);
-  bitset<8> bs16(bs1->at(6));
-  EXPECT_EQ(bs16, key_data_5);
-  bitset<8> bs17(bs1->at(7));
-  EXPECT_EQ(bs17, key_data_6);
-  bitset<8> bs18(bs1->at(8));
-  EXPECT_EQ(bs18, key_data_7);
-  Buf* bf11 = new Buf(bs1, !this->le);
-  optional<int64_t> data2 = b1.DecodeKey(bf11);
-  EXPECT_EQ(data1, data2);
-  delete bs1;
-  delete bf1;
-  delete bf11;
+  {
+    Buf encode_buf(1, !this->le);
+    schema.EncodeKey(data1, encode_buf);
+    std::string bs1 = encode_buf.GetString();
+    std::bitset<8> bs10(bs1.at(0));
+    EXPECT_EQ(bs10, not_null_tag);
+    std::bitset<8> bs11(bs1.at(1));
+    EXPECT_EQ(bs11, key_data_0);
+    std::bitset<8> bs12(bs1.at(2));
+    EXPECT_EQ(bs12, key_data_1);
+    std::bitset<8> bs13(bs1.at(3));
+    EXPECT_EQ(bs13, key_data_2);
+    std::bitset<8> bs14(bs1.at(4));
+    EXPECT_EQ(bs14, key_data_3);
+    std::bitset<8> bs15(bs1.at(5));
+    EXPECT_EQ(bs15, key_data_4);
+    std::bitset<8> bs16(bs1.at(6));
+    EXPECT_EQ(bs16, key_data_5);
+    std::bitset<8> bs17(bs1.at(7));
+    EXPECT_EQ(bs17, key_data_6);
+    std::bitset<8> bs18(bs1.at(8));
+    EXPECT_EQ(bs18, key_data_7);
+    Buf decode_buf(bs1, !this->le);
+    auto decode_data = schema.DecodeKey(decode_buf);
+    EXPECT_EQ(data1, std::any_cast<int64_t>(decode_data));
+  }
 
-  b1.SetIsKey(false);
-  Buf* bf2 = new Buf(1, !this->le);
-  b1.EncodeValue(bf2, data1);
-  string* bs2 = bf2->GetBytes();
-  bitset<8> bs20(bs2->at(0));
-  EXPECT_EQ(bs20, not_null_tag);
-  bitset<8> bs21(bs2->at(1));
-  EXPECT_EQ(bs21, value_data_0);
-  bitset<8> bs22(bs2->at(2));
-  EXPECT_EQ(bs22, value_data_1);
-  bitset<8> bs23(bs2->at(3));
-  EXPECT_EQ(bs23, value_data_2);
-  bitset<8> bs24(bs2->at(4));
-  EXPECT_EQ(bs24, value_data_3);
-  bitset<8> bs25(bs2->at(5));
-  EXPECT_EQ(bs25, value_data_4);
-  bitset<8> bs26(bs2->at(6));
-  EXPECT_EQ(bs26, value_data_5);
-  bitset<8> bs27(bs2->at(7));
-  EXPECT_EQ(bs27, value_data_6);
-  bitset<8> bs28(bs2->at(8));
-  EXPECT_EQ(bs28, value_data_7);
-  Buf* bf21 = new Buf(bs2, !this->le);
-  optional<int64_t> data3 = b1.DecodeValue(bf21);
-  EXPECT_EQ(data1, data3);
-  delete bs2;
-  delete bf2;
-  delete bf21;
+  {
+    schema.SetIsKey(false);
+    Buf encode_buf(1, !this->le);
+    schema.EncodeValue(data1, encode_buf);
+    std::string bs2 = encode_buf.GetString();
+    std::bitset<8> bs20(bs2.at(0));
+    EXPECT_EQ(bs20, not_null_tag);
+    std::bitset<8> bs21(bs2.at(1));
+    EXPECT_EQ(bs21, value_data_0);
+    std::bitset<8> bs22(bs2.at(2));
+    EXPECT_EQ(bs22, value_data_1);
+    std::bitset<8> bs23(bs2.at(3));
+    EXPECT_EQ(bs23, value_data_2);
+    std::bitset<8> bs24(bs2.at(4));
+    EXPECT_EQ(bs24, value_data_3);
+    std::bitset<8> bs25(bs2.at(5));
+    EXPECT_EQ(bs25, value_data_4);
+    std::bitset<8> bs26(bs2.at(6));
+    EXPECT_EQ(bs26, value_data_5);
+    std::bitset<8> bs27(bs2.at(7));
+    EXPECT_EQ(bs27, value_data_6);
+    std::bitset<8> bs28(bs2.at(8));
+    EXPECT_EQ(bs28, value_data_7);
+    Buf decode_buf(bs2, !this->le);
+    auto decode_data = schema.DecodeValue(decode_buf);
+    EXPECT_EQ(data1, std::any_cast<int64_t>(decode_data));
+  }
 }
 
 TEST_F(DingoSerialTest, doubleSchemaPosLeBe) {
   double data = 345235.32656;
   // bitset<64> key_data("1100000100010101000100100100110101001110011001011011111010100001");
-  bitset<8> key_data_0("11000001");
-  bitset<8> key_data_1("00010101");
-  bitset<8> key_data_2("00010010");
-  bitset<8> key_data_3("01001101");
-  bitset<8> key_data_4("01001110");
-  bitset<8> key_data_5("01100101");
-  bitset<8> key_data_6("10111110");
-  bitset<8> key_data_7("10100001");
+  std::bitset<8> key_data_0("11000001");
+  std::bitset<8> key_data_1("00010101");
+  std::bitset<8> key_data_2("00010010");
+  std::bitset<8> key_data_3("01001101");
+  std::bitset<8> key_data_4("01001110");
+  std::bitset<8> key_data_5("01100101");
+  std::bitset<8> key_data_6("10111110");
+  std::bitset<8> key_data_7("10100001");
   // bitset<64> value_data("0100000100010101000100100100110101001110011001011011111010100001");
-  bitset<8> value_data_0("01000001");
-  bitset<8> value_data_1("00010101");
-  bitset<8> value_data_2("00010010");
-  bitset<8> value_data_3("01001101");
-  bitset<8> value_data_4("01001110");
-  bitset<8> value_data_5("01100101");
-  bitset<8> value_data_6("10111110");
-  bitset<8> value_data_7("10100001");
-  bitset<8> not_null_tag("00000001");
+  std::bitset<8> value_data_0("01000001");
+  std::bitset<8> value_data_1("00010101");
+  std::bitset<8> value_data_2("00010010");
+  std::bitset<8> value_data_3("01001101");
+  std::bitset<8> value_data_4("01001110");
+  std::bitset<8> value_data_5("01100101");
+  std::bitset<8> value_data_6("10111110");
+  std::bitset<8> value_data_7("10100001");
+  std::bitset<8> not_null_tag("00000001");
 
-  DingoSchema<optional<double>> b1;
-  b1.SetIndex(0);
-  optional<double> data1 = data;
+  DingoSchema<double> schema;
+  schema.SetIndex(0);
+  double data1 = data;
 
-  b1.SetAllowNull(true);
-  b1.SetIsKey(true);
+  schema.SetAllowNull(true);
+  schema.SetIsKey(true);
   if (IsLE()) {
-    b1.SetIsLe(true);
+    schema.SetIsLe(true);
   } else {
-    b1.SetIsLe(false);
+    schema.SetIsLe(false);
   }
-  Buf* bf1 = new Buf(1, this->le);
-  b1.EncodeKey(bf1, data1);
-  string* bs1 = bf1->GetBytes();
-  bitset<8> bs10(bs1->at(0));
-  EXPECT_EQ(bs10, not_null_tag);
-  bitset<8> bs11(bs1->at(1));
-  EXPECT_EQ(bs11, key_data_0);
-  bitset<8> bs12(bs1->at(2));
-  EXPECT_EQ(bs12, key_data_1);
-  bitset<8> bs13(bs1->at(3));
-  EXPECT_EQ(bs13, key_data_2);
-  bitset<8> bs14(bs1->at(4));
-  EXPECT_EQ(bs14, key_data_3);
-  bitset<8> bs15(bs1->at(5));
-  EXPECT_EQ(bs15, key_data_4);
-  bitset<8> bs16(bs1->at(6));
-  EXPECT_EQ(bs16, key_data_5);
-  bitset<8> bs17(bs1->at(7));
-  EXPECT_EQ(bs17, key_data_6);
-  bitset<8> bs18(bs1->at(8));
-  EXPECT_EQ(bs18, key_data_7);
-  Buf* bf11 = new Buf(bs1, this->le);
-  optional<double> data2 = b1.DecodeKey(bf11);
-  EXPECT_EQ(data1, data2);
-  delete bs1;
-  delete bf1;
-  delete bf11;
+  {
+    Buf encode_buf(1, this->le);
+    schema.EncodeKey(data1, encode_buf);
+    std::string bs1 = encode_buf.GetString();
+    std::bitset<8> bs10(bs1.at(0));
+    EXPECT_EQ(bs10, not_null_tag);
+    std::bitset<8> bs11(bs1.at(1));
+    EXPECT_EQ(bs11, key_data_0);
+    std::bitset<8> bs12(bs1.at(2));
+    EXPECT_EQ(bs12, key_data_1);
+    std::bitset<8> bs13(bs1.at(3));
+    EXPECT_EQ(bs13, key_data_2);
+    std::bitset<8> bs14(bs1.at(4));
+    EXPECT_EQ(bs14, key_data_3);
+    std::bitset<8> bs15(bs1.at(5));
+    EXPECT_EQ(bs15, key_data_4);
+    std::bitset<8> bs16(bs1.at(6));
+    EXPECT_EQ(bs16, key_data_5);
+    std::bitset<8> bs17(bs1.at(7));
+    EXPECT_EQ(bs17, key_data_6);
+    std::bitset<8> bs18(bs1.at(8));
+    EXPECT_EQ(bs18, key_data_7);
+    Buf decode_buf(bs1, this->le);
+    auto decode_data = schema.DecodeKey(decode_buf);
+    EXPECT_EQ(data1, std::any_cast<double>(decode_data));
+  }
 
-  b1.SetIsKey(false);
-  Buf* bf2 = new Buf(1, this->le);
-  b1.EncodeValue(bf2, data1);
-  string* bs2 = bf2->GetBytes();
-  bitset<8> bs20(bs2->at(0));
-  EXPECT_EQ(bs20, not_null_tag);
-  bitset<8> bs21(bs2->at(1));
-  EXPECT_EQ(bs21, value_data_0);
-  bitset<8> bs22(bs2->at(2));
-  EXPECT_EQ(bs22, value_data_1);
-  bitset<8> bs23(bs2->at(3));
-  EXPECT_EQ(bs23, value_data_2);
-  bitset<8> bs24(bs2->at(4));
-  EXPECT_EQ(bs24, value_data_3);
-  bitset<8> bs25(bs2->at(5));
-  EXPECT_EQ(bs25, value_data_4);
-  bitset<8> bs26(bs2->at(6));
-  EXPECT_EQ(bs26, value_data_5);
-  bitset<8> bs27(bs2->at(7));
-  EXPECT_EQ(bs27, value_data_6);
-  bitset<8> bs28(bs2->at(8));
-  EXPECT_EQ(bs28, value_data_7);
-  Buf* bf21 = new Buf(bs2, this->le);
-  optional<double> data3 = b1.DecodeValue(bf21);
-  EXPECT_EQ(data1, data3);
-  delete bs2;
-  delete bf2;
-  delete bf21;
+  {
+    schema.SetIsKey(false);
+    Buf encode_buf(1, this->le);
+    schema.EncodeValue(data1, encode_buf);
+    std::string bs2 = encode_buf.GetString();
+    std::bitset<8> bs20(bs2.at(0));
+    EXPECT_EQ(bs20, not_null_tag);
+    std::bitset<8> bs21(bs2.at(1));
+    EXPECT_EQ(bs21, value_data_0);
+    std::bitset<8> bs22(bs2.at(2));
+    EXPECT_EQ(bs22, value_data_1);
+    std::bitset<8> bs23(bs2.at(3));
+    EXPECT_EQ(bs23, value_data_2);
+    std::bitset<8> bs24(bs2.at(4));
+    EXPECT_EQ(bs24, value_data_3);
+    std::bitset<8> bs25(bs2.at(5));
+    EXPECT_EQ(bs25, value_data_4);
+    std::bitset<8> bs26(bs2.at(6));
+    EXPECT_EQ(bs26, value_data_5);
+    std::bitset<8> bs27(bs2.at(7));
+    EXPECT_EQ(bs27, value_data_6);
+    std::bitset<8> bs28(bs2.at(8));
+    EXPECT_EQ(bs28, value_data_7);
+    Buf decode_buf(bs2, this->le);
+    auto decode_data = schema.DecodeValue(decode_buf);
+    EXPECT_EQ(data1, std::any_cast<double>(decode_data));
+  }
 }
 
 TEST_F(DingoSerialTest, doubleSchemaPosFakeLeBe) {
@@ -845,184 +811,179 @@ TEST_F(DingoSerialTest, doubleSchemaPosFakeLeBe) {
   double data;
   memcpy(&data, &data_bits, 8);
   // bitset<64> key_data("1100000100010101000100100100110101001110010101100000010000011001");
-  bitset<8> key_data_0("11000001");
-  bitset<8> key_data_1("00010101");
-  bitset<8> key_data_2("00010010");
-  bitset<8> key_data_3("01001101");
-  bitset<8> key_data_4("01001110");
-  bitset<8> key_data_5("01010110");
-  bitset<8> key_data_6("00000100");
-  bitset<8> key_data_7("00011001");
+  std::bitset<8> key_data_0("11000001");
+  std::bitset<8> key_data_1("00010101");
+  std::bitset<8> key_data_2("00010010");
+  std::bitset<8> key_data_3("01001101");
+  std::bitset<8> key_data_4("01001110");
+  std::bitset<8> key_data_5("01010110");
+  std::bitset<8> key_data_6("00000100");
+  std::bitset<8> key_data_7("00011001");
   // bitset<64> value_data("0100000100010101000100100100110101001110010101100000010000011001");
-  bitset<8> value_data_0("01000001");
-  bitset<8> value_data_1("00010101");
-  bitset<8> value_data_2("00010010");
-  bitset<8> value_data_3("01001101");
-  bitset<8> value_data_4("01001110");
-  bitset<8> value_data_5("01010110");
-  bitset<8> value_data_6("00000100");
-  bitset<8> value_data_7("00011001");
-  bitset<8> not_null_tag("00000001");
+  std::bitset<8> value_data_0("01000001");
+  std::bitset<8> value_data_1("00010101");
+  std::bitset<8> value_data_2("00010010");
+  std::bitset<8> value_data_3("01001101");
+  std::bitset<8> value_data_4("01001110");
+  std::bitset<8> value_data_5("01010110");
+  std::bitset<8> value_data_6("00000100");
+  std::bitset<8> value_data_7("00011001");
+  std::bitset<8> not_null_tag("00000001");
 
-  DingoSchema<optional<double>> b1;
-  b1.SetIndex(0);
-  optional<double> data1 = data;
+  DingoSchema<double> schema;
+  schema.SetIndex(0);
+  double data1 = data;
 
-  b1.SetAllowNull(true);
-  b1.SetIsKey(true);
+  schema.SetAllowNull(true);
+  schema.SetIsKey(true);
   if (!this->le) {
-    cout << "LE" << '\n';
-    b1.SetIsLe(true);
+    schema.SetIsLe(true);
   } else {
-    b1.SetIsLe(false);
+    schema.SetIsLe(false);
   }
-  Buf* bf1 = new Buf(1, !this->le);
-  b1.EncodeKey(bf1, data1);
-  string* bs1 = bf1->GetBytes();
-  bitset<8> bs10(bs1->at(0));
-  EXPECT_EQ(bs10, not_null_tag);
-  bitset<8> bs11(bs1->at(1));
-  EXPECT_EQ(bs11, key_data_0);
-  bitset<8> bs12(bs1->at(2));
-  EXPECT_EQ(bs12, key_data_1);
-  bitset<8> bs13(bs1->at(3));
-  EXPECT_EQ(bs13, key_data_2);
-  bitset<8> bs14(bs1->at(4));
-  EXPECT_EQ(bs14, key_data_3);
-  bitset<8> bs15(bs1->at(5));
-  EXPECT_EQ(bs15, key_data_4);
-  bitset<8> bs16(bs1->at(6));
-  EXPECT_EQ(bs16, key_data_5);
-  bitset<8> bs17(bs1->at(7));
-  EXPECT_EQ(bs17, key_data_6);
-  bitset<8> bs18(bs1->at(8));
-  EXPECT_EQ(bs18, key_data_7);
-  Buf* bf11 = new Buf(bs1, !this->le);
-  optional<double> data2 = b1.DecodeKey(bf11);
-  EXPECT_EQ(data1, data2);
-  delete bs1;
-  delete bf1;
-  delete bf11;
+  {
+    Buf encode_buf(1, !this->le);
+    schema.EncodeKey(data1, encode_buf);
+    std::string bs1 = encode_buf.GetString();
+    std::bitset<8> bs10(bs1.at(0));
+    EXPECT_EQ(bs10, not_null_tag);
+    std::bitset<8> bs11(bs1.at(1));
+    EXPECT_EQ(bs11, key_data_0);
+    std::bitset<8> bs12(bs1.at(2));
+    EXPECT_EQ(bs12, key_data_1);
+    std::bitset<8> bs13(bs1.at(3));
+    EXPECT_EQ(bs13, key_data_2);
+    std::bitset<8> bs14(bs1.at(4));
+    EXPECT_EQ(bs14, key_data_3);
+    std::bitset<8> bs15(bs1.at(5));
+    EXPECT_EQ(bs15, key_data_4);
+    std::bitset<8> bs16(bs1.at(6));
+    EXPECT_EQ(bs16, key_data_5);
+    std::bitset<8> bs17(bs1.at(7));
+    EXPECT_EQ(bs17, key_data_6);
+    std::bitset<8> bs18(bs1.at(8));
+    EXPECT_EQ(bs18, key_data_7);
+    Buf decode_buf(bs1, !this->le);
+    auto decode_data = schema.DecodeKey(decode_buf);
+    EXPECT_EQ(data1, std::any_cast<double>(decode_data));
+  }
 
-  b1.SetIsKey(false);
-  Buf* bf2 = new Buf(1, !this->le);
-  b1.EncodeValue(bf2, data1);
-  string* bs2 = bf2->GetBytes();
-  bitset<8> bs20(bs2->at(0));
-  EXPECT_EQ(bs20, not_null_tag);
-  bitset<8> bs21(bs2->at(1));
-  EXPECT_EQ(bs21, value_data_0);
-  bitset<8> bs22(bs2->at(2));
-  EXPECT_EQ(bs22, value_data_1);
-  bitset<8> bs23(bs2->at(3));
-  EXPECT_EQ(bs23, value_data_2);
-  bitset<8> bs24(bs2->at(4));
-  EXPECT_EQ(bs24, value_data_3);
-  bitset<8> bs25(bs2->at(5));
-  EXPECT_EQ(bs25, value_data_4);
-  bitset<8> bs26(bs2->at(6));
-  EXPECT_EQ(bs26, value_data_5);
-  bitset<8> bs27(bs2->at(7));
-  EXPECT_EQ(bs27, value_data_6);
-  bitset<8> bs28(bs2->at(8));
-  EXPECT_EQ(bs28, value_data_7);
-  Buf* bf21 = new Buf(bs2, !this->le);
-  optional<double> data3 = b1.DecodeValue(bf21);
-  EXPECT_EQ(data1, data3);
-  delete bs2;
-  delete bf2;
-  delete bf21;
+  {
+    schema.SetIsKey(false);
+    Buf encode_buf(1, !this->le);
+    schema.EncodeValue(data1, encode_buf);
+    std::string bs2 = encode_buf.GetString();
+    std::bitset<8> bs20(bs2.at(0));
+    EXPECT_EQ(bs20, not_null_tag);
+    std::bitset<8> bs21(bs2.at(1));
+    EXPECT_EQ(bs21, value_data_0);
+    std::bitset<8> bs22(bs2.at(2));
+    EXPECT_EQ(bs22, value_data_1);
+    std::bitset<8> bs23(bs2.at(3));
+    EXPECT_EQ(bs23, value_data_2);
+    std::bitset<8> bs24(bs2.at(4));
+    EXPECT_EQ(bs24, value_data_3);
+    std::bitset<8> bs25(bs2.at(5));
+    EXPECT_EQ(bs25, value_data_4);
+    std::bitset<8> bs26(bs2.at(6));
+    EXPECT_EQ(bs26, value_data_5);
+    std::bitset<8> bs27(bs2.at(7));
+    EXPECT_EQ(bs27, value_data_6);
+    std::bitset<8> bs28(bs2.at(8));
+    EXPECT_EQ(bs28, value_data_7);
+    Buf decode_buf(bs2, !this->le);
+    auto decode_data = schema.DecodeValue(decode_buf);
+    EXPECT_EQ(data1, std::any_cast<double>(decode_data));
+  }
 }
 
 TEST_F(DingoSerialTest, doubleSchemaNegLeBe) {
   double data = -345235.32656;
   // bitset<64> key_data("0011111011101010111011011011001010110001100110100100000101011110");
-  bitset<8> key_data_0("00111110");
-  bitset<8> key_data_1("11101010");
-  bitset<8> key_data_2("11101101");
-  bitset<8> key_data_3("10110010");
-  bitset<8> key_data_4("10110001");
-  bitset<8> key_data_5("10011010");
-  bitset<8> key_data_6("01000001");
-  bitset<8> key_data_7("01011110");
+  std::bitset<8> key_data_0("00111110");
+  std::bitset<8> key_data_1("11101010");
+  std::bitset<8> key_data_2("11101101");
+  std::bitset<8> key_data_3("10110010");
+  std::bitset<8> key_data_4("10110001");
+  std::bitset<8> key_data_5("10011010");
+  std::bitset<8> key_data_6("01000001");
+  std::bitset<8> key_data_7("01011110");
   // bitset<64> value_data("1100000100010101000100100100110101001110011001011011111010100001");
-  bitset<8> value_data_0("11000001");
-  bitset<8> value_data_1("00010101");
-  bitset<8> value_data_2("00010010");
-  bitset<8> value_data_3("01001101");
-  bitset<8> value_data_4("01001110");
-  bitset<8> value_data_5("01100101");
-  bitset<8> value_data_6("10111110");
-  bitset<8> value_data_7("10100001");
-  bitset<8> not_null_tag("00000001");
+  std::bitset<8> value_data_0("11000001");
+  std::bitset<8> value_data_1("00010101");
+  std::bitset<8> value_data_2("00010010");
+  std::bitset<8> value_data_3("01001101");
+  std::bitset<8> value_data_4("01001110");
+  std::bitset<8> value_data_5("01100101");
+  std::bitset<8> value_data_6("10111110");
+  std::bitset<8> value_data_7("10100001");
+  std::bitset<8> not_null_tag("00000001");
 
-  DingoSchema<optional<double>> b1;
-  b1.SetIndex(0);
-  optional<double> data1 = data;
+  DingoSchema<double> schema;
+  schema.SetIndex(0);
+  double data1 = data;
 
-  b1.SetAllowNull(true);
-  b1.SetIsKey(true);
+  schema.SetAllowNull(true);
+  schema.SetIsKey(true);
   if (this->le) {
-    b1.SetIsLe(true);
+    schema.SetIsLe(true);
   } else {
-    b1.SetIsLe(false);
+    schema.SetIsLe(false);
   }
-  Buf* bf1 = new Buf(1, this->le);
-  b1.EncodeKey(bf1, data1);
-  string* bs1 = bf1->GetBytes();
-  bitset<8> bs10(bs1->at(0));
-  EXPECT_EQ(bs10, not_null_tag);
-  bitset<8> bs11(bs1->at(1));
-  EXPECT_EQ(bs11, key_data_0);
-  bitset<8> bs12(bs1->at(2));
-  EXPECT_EQ(bs12, key_data_1);
-  bitset<8> bs13(bs1->at(3));
-  EXPECT_EQ(bs13, key_data_2);
-  bitset<8> bs14(bs1->at(4));
-  EXPECT_EQ(bs14, key_data_3);
-  bitset<8> bs15(bs1->at(5));
-  EXPECT_EQ(bs15, key_data_4);
-  bitset<8> bs16(bs1->at(6));
-  EXPECT_EQ(bs16, key_data_5);
-  bitset<8> bs17(bs1->at(7));
-  EXPECT_EQ(bs17, key_data_6);
-  bitset<8> bs18(bs1->at(8));
-  EXPECT_EQ(bs18, key_data_7);
-  Buf* bf11 = new Buf(bs1, this->le);
-  optional<double> data2 = b1.DecodeKey(bf11);
-  EXPECT_EQ(data1, data2);
-  delete bs1;
-  delete bf1;
-  delete bf11;
+  {
+    Buf encode_buf(1, this->le);
+    schema.EncodeKey(data1, encode_buf);
+    std::string bs1 = encode_buf.GetString();
+    std::bitset<8> bs10(bs1.at(0));
+    EXPECT_EQ(bs10, not_null_tag);
+    std::bitset<8> bs11(bs1.at(1));
+    EXPECT_EQ(bs11, key_data_0);
+    std::bitset<8> bs12(bs1.at(2));
+    EXPECT_EQ(bs12, key_data_1);
+    std::bitset<8> bs13(bs1.at(3));
+    EXPECT_EQ(bs13, key_data_2);
+    std::bitset<8> bs14(bs1.at(4));
+    EXPECT_EQ(bs14, key_data_3);
+    std::bitset<8> bs15(bs1.at(5));
+    EXPECT_EQ(bs15, key_data_4);
+    std::bitset<8> bs16(bs1.at(6));
+    EXPECT_EQ(bs16, key_data_5);
+    std::bitset<8> bs17(bs1.at(7));
+    EXPECT_EQ(bs17, key_data_6);
+    std::bitset<8> bs18(bs1.at(8));
+    EXPECT_EQ(bs18, key_data_7);
+    Buf decode_buf(bs1, this->le);
+    auto decode_data = schema.DecodeKey(decode_buf);
+    EXPECT_EQ(data1, std::any_cast<double>(decode_data));
+  }
 
-  b1.SetIsKey(false);
-  Buf* bf2 = new Buf(1, this->le);
-  b1.EncodeValue(bf2, data1);
-  string* bs2 = bf2->GetBytes();
-  bitset<8> bs20(bs2->at(0));
-  EXPECT_EQ(bs20, not_null_tag);
-  bitset<8> bs21(bs2->at(1));
-  EXPECT_EQ(bs21, value_data_0);
-  bitset<8> bs22(bs2->at(2));
-  EXPECT_EQ(bs22, value_data_1);
-  bitset<8> bs23(bs2->at(3));
-  EXPECT_EQ(bs23, value_data_2);
-  bitset<8> bs24(bs2->at(4));
-  EXPECT_EQ(bs24, value_data_3);
-  bitset<8> bs25(bs2->at(5));
-  EXPECT_EQ(bs25, value_data_4);
-  bitset<8> bs26(bs2->at(6));
-  EXPECT_EQ(bs26, value_data_5);
-  bitset<8> bs27(bs2->at(7));
-  EXPECT_EQ(bs27, value_data_6);
-  bitset<8> bs28(bs2->at(8));
-  EXPECT_EQ(bs28, value_data_7);
-  Buf* bf21 = new Buf(bs2, this->le);
-  optional<double> data3 = b1.DecodeValue(bf21);
-  EXPECT_EQ(data1, data3);
-  delete bs2;
-  delete bf2;
-  delete bf21;
+  {
+    schema.SetIsKey(false);
+    Buf encode_buf(1, this->le);
+    schema.EncodeValue(data1, encode_buf);
+    std::string bs2 = encode_buf.GetString();
+    std::bitset<8> bs20(bs2.at(0));
+    EXPECT_EQ(bs20, not_null_tag);
+    std::bitset<8> bs21(bs2.at(1));
+    EXPECT_EQ(bs21, value_data_0);
+    std::bitset<8> bs22(bs2.at(2));
+    EXPECT_EQ(bs22, value_data_1);
+    std::bitset<8> bs23(bs2.at(3));
+    EXPECT_EQ(bs23, value_data_2);
+    std::bitset<8> bs24(bs2.at(4));
+    EXPECT_EQ(bs24, value_data_3);
+    std::bitset<8> bs25(bs2.at(5));
+    EXPECT_EQ(bs25, value_data_4);
+    std::bitset<8> bs26(bs2.at(6));
+    EXPECT_EQ(bs26, value_data_5);
+    std::bitset<8> bs27(bs2.at(7));
+    EXPECT_EQ(bs27, value_data_6);
+    std::bitset<8> bs28(bs2.at(8));
+    EXPECT_EQ(bs28, value_data_7);
+    Buf decode_buf(bs2, this->le);
+    auto decode_data = schema.DecodeValue(decode_buf);
+    EXPECT_EQ(data1, std::any_cast<double>(decode_data));
+  }
 }
 
 TEST_F(DingoSerialTest, doubleSchemaNegFakeLeBe) {
@@ -1033,322 +994,264 @@ TEST_F(DingoSerialTest, doubleSchemaNegFakeLeBe) {
   double data;
   memcpy(&data, &data_bits, 8);
   // bitset<64> key_data("0011111011101010111011011011001010110001100110100100000101011110");
-  bitset<8> key_data_0("00111110");
-  bitset<8> key_data_1("11101010");
-  bitset<8> key_data_2("11101101");
-  bitset<8> key_data_3("10110010");
-  bitset<8> key_data_4("10110001");
-  bitset<8> key_data_5("10011010");
-  bitset<8> key_data_6("01000001");
-  bitset<8> key_data_7("01011110");
+  std::bitset<8> key_data_0("00111110");
+  std::bitset<8> key_data_1("11101010");
+  std::bitset<8> key_data_2("11101101");
+  std::bitset<8> key_data_3("10110010");
+  std::bitset<8> key_data_4("10110001");
+  std::bitset<8> key_data_5("10011010");
+  std::bitset<8> key_data_6("01000001");
+  std::bitset<8> key_data_7("01011110");
   // bitset<64> value_data("1100000100010101000100100100110101001110011001011011111010100001");
-  bitset<8> value_data_0("11000001");
-  bitset<8> value_data_1("00010101");
-  bitset<8> value_data_2("00010010");
-  bitset<8> value_data_3("01001101");
-  bitset<8> value_data_4("01001110");
-  bitset<8> value_data_5("01100101");
-  bitset<8> value_data_6("10111110");
-  bitset<8> value_data_7("10100001");
-  bitset<8> not_null_tag("00000001");
+  std::bitset<8> value_data_0("11000001");
+  std::bitset<8> value_data_1("00010101");
+  std::bitset<8> value_data_2("00010010");
+  std::bitset<8> value_data_3("01001101");
+  std::bitset<8> value_data_4("01001110");
+  std::bitset<8> value_data_5("01100101");
+  std::bitset<8> value_data_6("10111110");
+  std::bitset<8> value_data_7("10100001");
+  std::bitset<8> not_null_tag("00000001");
 
-  DingoSchema<optional<double>> b1;
-  b1.SetIndex(0);
-  optional<double> data1 = data;
+  DingoSchema<double> schema;
+  schema.SetIndex(0);
+  double data1 = data;
 
-  b1.SetAllowNull(true);
-  b1.SetIsKey(true);
+  schema.SetAllowNull(true);
+  schema.SetIsKey(true);
   if (!this->le) {
-    b1.SetIsLe(true);
+    schema.SetIsLe(true);
   } else {
-    b1.SetIsLe(false);
+    schema.SetIsLe(false);
   }
-  Buf* bf1 = new Buf(1, !this->le);
-  b1.EncodeKey(bf1, data1);
-  string* bs1 = bf1->GetBytes();
-  bitset<8> bs10(bs1->at(0));
-  EXPECT_EQ(bs10, not_null_tag);
-  bitset<8> bs11(bs1->at(1));
-  EXPECT_EQ(bs11, key_data_0);
-  bitset<8> bs12(bs1->at(2));
-  EXPECT_EQ(bs12, key_data_1);
-  bitset<8> bs13(bs1->at(3));
-  EXPECT_EQ(bs13, key_data_2);
-  bitset<8> bs14(bs1->at(4));
-  EXPECT_EQ(bs14, key_data_3);
-  bitset<8> bs15(bs1->at(5));
-  EXPECT_EQ(bs15, key_data_4);
-  bitset<8> bs16(bs1->at(6));
-  EXPECT_EQ(bs16, key_data_5);
-  bitset<8> bs17(bs1->at(7));
-  EXPECT_EQ(bs17, key_data_6);
-  bitset<8> bs18(bs1->at(8));
-  EXPECT_EQ(bs18, key_data_7);
-  Buf* bf11 = new Buf(bs1, !this->le);
-  optional<double> data2 = b1.DecodeKey(bf11);
-  EXPECT_EQ(data1, data2);
-  delete bs1;
-  delete bf1;
-  delete bf11;
+  {
+    Buf encode_buf(1, !this->le);
+    schema.EncodeKey(data1, encode_buf);
+    std::string bs1 = encode_buf.GetString();
+    std::bitset<8> bs10(bs1.at(0));
+    EXPECT_EQ(bs10, not_null_tag);
+    std::bitset<8> bs11(bs1.at(1));
+    EXPECT_EQ(bs11, key_data_0);
+    std::bitset<8> bs12(bs1.at(2));
+    EXPECT_EQ(bs12, key_data_1);
+    std::bitset<8> bs13(bs1.at(3));
+    EXPECT_EQ(bs13, key_data_2);
+    std::bitset<8> bs14(bs1.at(4));
+    EXPECT_EQ(bs14, key_data_3);
+    std::bitset<8> bs15(bs1.at(5));
+    EXPECT_EQ(bs15, key_data_4);
+    std::bitset<8> bs16(bs1.at(6));
+    EXPECT_EQ(bs16, key_data_5);
+    std::bitset<8> bs17(bs1.at(7));
+    EXPECT_EQ(bs17, key_data_6);
+    std::bitset<8> bs18(bs1.at(8));
+    EXPECT_EQ(bs18, key_data_7);
+    Buf decode_buf(bs1, !this->le);
+    auto decode_data = schema.DecodeKey(decode_buf);
+    EXPECT_EQ(data1, std::any_cast<double>(decode_data));
+  }
 
-  b1.SetIsKey(false);
-  Buf* bf2 = new Buf(1, !this->le);
-  b1.EncodeValue(bf2, data1);
-  string* bs2 = bf2->GetBytes();
-  bitset<8> bs20(bs2->at(0));
-  EXPECT_EQ(bs20, not_null_tag);
-  bitset<8> bs21(bs2->at(1));
-  EXPECT_EQ(bs21, value_data_0);
-  bitset<8> bs22(bs2->at(2));
-  EXPECT_EQ(bs22, value_data_1);
-  bitset<8> bs23(bs2->at(3));
-  EXPECT_EQ(bs23, value_data_2);
-  bitset<8> bs24(bs2->at(4));
-  EXPECT_EQ(bs24, value_data_3);
-  bitset<8> bs25(bs2->at(5));
-  EXPECT_EQ(bs25, value_data_4);
-  bitset<8> bs26(bs2->at(6));
-  EXPECT_EQ(bs26, value_data_5);
-  bitset<8> bs27(bs2->at(7));
-  EXPECT_EQ(bs27, value_data_6);
-  bitset<8> bs28(bs2->at(8));
-  EXPECT_EQ(bs28, value_data_7);
-  Buf* bf21 = new Buf(bs2, !this->le);
-  optional<double> data3 = b1.DecodeValue(bf21);
-  EXPECT_EQ(data1, data3);
-  delete bs2;
-  delete bf2;
-  delete bf21;
+  {
+    schema.SetIsKey(false);
+    Buf encode_buf(1, !this->le);
+    schema.EncodeValue(data1, encode_buf);
+    std::string bs2 = encode_buf.GetString();
+    std::bitset<8> bs20(bs2.at(0));
+    EXPECT_EQ(bs20, not_null_tag);
+    std::bitset<8> bs21(bs2.at(1));
+    EXPECT_EQ(bs21, value_data_0);
+    std::bitset<8> bs22(bs2.at(2));
+    EXPECT_EQ(bs22, value_data_1);
+    std::bitset<8> bs23(bs2.at(3));
+    EXPECT_EQ(bs23, value_data_2);
+    std::bitset<8> bs24(bs2.at(4));
+    EXPECT_EQ(bs24, value_data_3);
+    std::bitset<8> bs25(bs2.at(5));
+    EXPECT_EQ(bs25, value_data_4);
+    std::bitset<8> bs26(bs2.at(6));
+    EXPECT_EQ(bs26, value_data_5);
+    std::bitset<8> bs27(bs2.at(7));
+    EXPECT_EQ(bs27, value_data_6);
+    std::bitset<8> bs28(bs2.at(8));
+    EXPECT_EQ(bs28, value_data_7);
+    Buf decode_buf(bs2, !this->le);
+    auto decode_data = schema.DecodeValue(decode_buf);
+    EXPECT_EQ(data1, std::any_cast<double>(decode_data));
+  }
 }
 
 TEST_F(DingoSerialTest, longSchema) {
-  DingoSchema<optional<int64_t>> b1;
-  b1.SetIndex(0);
-  b1.SetAllowNull(false);
-  b1.SetIsKey(true);
-  optional<int64_t> data1 = 1543234;
-  Buf* bf1 = new Buf(1, this->le);
-  b1.EncodeKey(bf1, data1);
-  string* bs1 = bf1->GetBytes();
-  Buf* bf2 = new Buf(bs1, this->le);
-  delete bs1;
-  optional<int64_t> data2 = b1.DecodeKey(bf2);
-  delete bf1;
-  delete bf2;
-  if (data2.has_value()) {
-    EXPECT_EQ(data1, data2.value());
-  } else {
-    EXPECT_TRUE(0);
+  {
+    DingoSchema<int64_t> schema;
+    schema.SetIndex(0);
+    schema.SetAllowNull(false);
+    schema.SetIsKey(true);
+    int64_t data1 = 1543234;
+    Buf encode_buf(1, this->le);
+    schema.EncodeKey(data1, encode_buf);
+    Buf decode_buf(encode_buf.GetString(), this->le);
+    auto decode_data = schema.DecodeKey(decode_buf);
+    ASSERT_TRUE(decode_data.has_value());
+    EXPECT_EQ(data1, std::any_cast<int64_t>(decode_data));
   }
 
-  DingoSchema<optional<int64_t>> b2;
-  b2.SetIndex(0);
-  b2.SetAllowNull(true);
-  b2.SetIsKey(false);
-  optional<int64_t> data3 = 532142;
-  Buf* bf3 = new Buf(1, this->le);
-  b2.EncodeValue(bf3, data3);
-  string* bs2 = bf3->GetBytes();
-  Buf* bf4 = new Buf(bs2, this->le);
-  delete bs2;
-  optional<int64_t> data4 = b2.DecodeValue(bf4);
-  delete bf3;
-  delete bf4;
-  if (data4.has_value()) {
-    EXPECT_EQ(data3, data4.value());
-  } else {
-    EXPECT_TRUE(0);
+  {
+    DingoSchema<int64_t> schema;
+    schema.SetIndex(0);
+    schema.SetAllowNull(true);
+    schema.SetIsKey(false);
+    int64_t data = 532142;
+    Buf encode_buf(1, this->le);
+    schema.EncodeValue(data, encode_buf);
+    Buf decode_buf(encode_buf.GetString(), this->le);
+    auto decode_data = schema.DecodeValue(decode_buf);
+    ASSERT_TRUE(decode_data.has_value());
+    EXPECT_EQ(data, std::any_cast<int64_t>(decode_data));
   }
 
-  optional<int64_t> data5 = nullopt;
-  Buf* bf5 = new Buf(1, this->le);
-  b2.EncodeValue(bf5, data5);
-  string* bs3 = bf5->GetBytes();
-  Buf* bf6 = new Buf(bs3, this->le);
-  delete bs3;
-  optional<int64_t> data6 = b2.DecodeValue(bf6);
-  delete bf5;
-  delete bf6;
-  EXPECT_FALSE(data6.has_value());
+  {
+    DingoSchema<int64_t> schema;
+    schema.SetIndex(0);
+    schema.SetAllowNull(true);
+    schema.SetIsKey(false);
 
-  DingoSchema<optional<int64_t>> b3;
-  b3.SetIndex(0);
-  b3.SetAllowNull(true);
-  b3.SetIsKey(true);
-  Buf* bf7 = new Buf(100, this->le);
-  b3.EncodeValue(bf7, nullopt);
-  string* bs4 = bf7->GetBytes();
-  Buf* bf8 = new Buf(bs4, this->le);
-  delete bs4;
-  EXPECT_FALSE(b3.DecodeKey(bf8).has_value());
-  delete bf7;
-  delete bf8;
+    Buf encode_buf(1, this->le);
+    schema.EncodeValue(std::any(), encode_buf);
+    Buf decode_buf(encode_buf.GetString(), this->le);
+    auto decode_data = schema.DecodeValue(decode_buf);
+    EXPECT_FALSE(decode_data.has_value());
+  }
+
+  {
+    DingoSchema<int64_t> schema;
+    schema.SetIndex(0);
+    schema.SetAllowNull(true);
+    schema.SetIsKey(true);
+    Buf encode_buf(100, this->le);
+    schema.EncodeValue(std::any(), encode_buf);
+    Buf decode_buf(encode_buf.GetString(), this->le);
+    EXPECT_FALSE(schema.DecodeKey(decode_buf).has_value());
+  }
 }
 
 TEST_F(DingoSerialTest, doubleSchema) {
-  DingoSchema<optional<double>> b1;
-  b1.SetIndex(0);
-  b1.SetAllowNull(false);
-  b1.SetIsKey(true);
-  optional<double> data1 = 154.3234;
-  Buf* bf1 = new Buf(1, this->le);
-  b1.EncodeKey(bf1, data1);
-  string* bs1 = bf1->GetBytes();
-  Buf* bf2 = new Buf(bs1, this->le);
-  delete bs1;
-  optional<double> data2 = b1.DecodeKey(bf2);
-  delete bf1;
-  delete bf2;
-  if (data2.has_value()) {
-    EXPECT_EQ(data1, data2.value());
-  } else {
-    EXPECT_TRUE(0);
+  {
+    DingoSchema<double> schema;
+    schema.SetIndex(0);
+    schema.SetAllowNull(false);
+    schema.SetIsKey(true);
+    double data = 154.3234;
+    Buf encode_buf(1, this->le);
+    schema.EncodeKey(data, encode_buf);
+    Buf decode_buf(encode_buf.GetString(), this->le);
+    auto decode_data = schema.DecodeKey(decode_buf);
+    ASSERT_TRUE(decode_data.has_value());
+    EXPECT_EQ(data, std::any_cast<double>(decode_data));
   }
 
-  DingoSchema<optional<double>> b2;
-  b2.SetIndex(0);
-  b2.SetAllowNull(true);
-  b2.SetIsKey(false);
-  optional<double> data3 = 5321.42;
-  Buf* bf3 = new Buf(1, this->le);
-  b2.EncodeValue(bf3, data3);
-  string* bs2 = bf3->GetBytes();
-  Buf* bf4 = new Buf(bs2, this->le);
-  delete bs2;
-  optional<double> data4 = b2.DecodeValue(bf4);
-  delete bf3;
-  delete bf4;
-  if (data4.has_value()) {
-    EXPECT_EQ(data3, data4.value());
-  } else {
-    EXPECT_TRUE(0);
+  {
+    DingoSchema<double> schema;
+    schema.SetIndex(0);
+    schema.SetAllowNull(true);
+    schema.SetIsKey(false);
+    double data = 5321.42;
+    Buf encode_buf(1, this->le);
+    schema.EncodeValue(data, encode_buf);
+    Buf decode_buf(encode_buf.GetString(), this->le);
+    auto decode_data = schema.DecodeValue(decode_buf);
+    ASSERT_TRUE(decode_data.has_value());
+    EXPECT_EQ(data, std::any_cast<double>(decode_data));
   }
 
-  optional<double> data5 = nullopt;
-  Buf* bf5 = new Buf(1, this->le);
-  b2.EncodeValue(bf5, data5);
-  string* bs3 = bf5->GetBytes();
-  Buf* bf6 = new Buf(bs3, this->le);
-  delete bs3;
-  optional<double> data6 = b2.DecodeValue(bf6);
-  delete bf5;
-  delete bf6;
-  EXPECT_FALSE(data6.has_value());
+  {
+    DingoSchema<double> schema;
+    schema.SetIndex(0);
+    schema.SetAllowNull(true);
+    schema.SetIsKey(false);
 
-  DingoSchema<optional<double>> b3;
-  b3.SetIndex(0);
-  b3.SetAllowNull(true);
-  b3.SetIsKey(true);
-  Buf* bf7 = new Buf(100, this->le);
-  b3.EncodeValue(bf7, nullopt);
-  string* bs4 = bf7->GetBytes();
-  Buf* bf8 = new Buf(bs4, this->le);
-  delete bs4;
-  EXPECT_FALSE(b3.DecodeKey(bf8).has_value());
-  delete bf7;
-  delete bf8;
+    Buf encode_buf(1, this->le);
+    schema.EncodeValue(std::any(), encode_buf);
+    Buf decode_buf(encode_buf.GetString(), this->le);
+    auto decode_data = schema.DecodeValue(decode_buf);
+
+    ASSERT_FALSE(decode_data.has_value());
+  }
+
+  {
+    DingoSchema<double> schema;
+    schema.SetIndex(0);
+    schema.SetAllowNull(true);
+    schema.SetIsKey(true);
+    Buf encode_buf(100, this->le);
+    schema.EncodeValue(std::any(), encode_buf);
+    Buf decode_buf(encode_buf.GetString(), this->le);
+    EXPECT_FALSE(schema.DecodeKey(decode_buf).has_value());
+  }
 }
 
 TEST_F(DingoSerialTest, stringSchema) {
-  DingoSchema<optional<shared_ptr<string>>> b1;
-  b1.SetIndex(0);
-  b1.SetAllowNull(false);
-  b1.SetIsKey(true);
-  Buf* bf1 = new Buf(1, this->le);
+  {
+    DingoSchema<std::string> schema;
+    schema.SetIndex(0);
+    schema.SetAllowNull(false);
+    schema.SetIsKey(true);
+    Buf encode_buf(1, this->le);
 
-  std::shared_ptr<std::string> s_data1 = std::make_shared<std::string>(
-      "test address test 中文 表情😊🏷️👌 test "
-      "测试测试测试三🤣😂😁🐱‍🐉👏");
-  std::optional<std::shared_ptr<std::string>> data1{s_data1};
+    std::string data =
+        "test address test 中文 表情😊🏷️👌 test "
+        "测试测试测试三🤣😂😁🐱‍🐉👏";
 
-  b1.EncodeKey(bf1, data1);
-  string* bs1 = bf1->GetBytes();
-  Buf* bf2 = new Buf(bs1, this->le);
-  delete bs1;
-  auto data2 = b1.DecodeKey(bf2);
-  delete bf1;
-  delete bf2;
-  if (data2.has_value()) {
-    EXPECT_EQ(*data1.value(), *data2.value());
-  } else {
-    EXPECT_TRUE(0);
+    schema.EncodeKey(data, encode_buf);
+    Buf decode_buf(encode_buf.GetString(), this->le);
+
+    auto decode_data = schema.DecodeKey(decode_buf);
+    ASSERT_TRUE(decode_data.has_value());
+    EXPECT_EQ(data, std::any_cast<std::string>(decode_data));
   }
 
-  DingoSchema<optional<shared_ptr<string>>> b2;
-  b2.SetIndex(0);
-  b2.SetAllowNull(true);
-  b2.SetIsKey(false);
-  std::shared_ptr<std::string> s_data3 = std::make_shared<std::string>(
-      "test address test 中文 表情😊🏷️👌 test "
-      "测试测试测试三🤣😂😁🐱‍🐉👏");
-  std::optional<std::shared_ptr<std::string>> data3{s_data3};
+  {
+    DingoSchema<std::string> schema;
+    schema.SetIndex(0);
+    schema.SetAllowNull(true);
+    schema.SetIsKey(false);
+    std::string data =
+        "test address test 中文 表情😊🏷️👌 test "
+        "测试测试测试三🤣😂😁🐱‍🐉👏";
 
-  Buf* bf3 = new Buf(1, this->le);
-  b2.EncodeValue(bf3, data3);
-  string* bs2 = bf3->GetBytes();
-  Buf* bf4 = new Buf(bs2, this->le);
-  delete bs2;
-  auto data4 = b2.DecodeValue(bf4);
-  delete bf3;
-  delete bf4;
-  if (data4.has_value()) {
-    EXPECT_EQ(*data3.value(), *data4.value()) << "Line: " << __LINE__;
-  } else {
-    EXPECT_TRUE(0) << "Line: " << __LINE__;
+    Buf encode_buf(1, this->le);
+    schema.EncodeValue(data, encode_buf);
+    Buf decode_buf(encode_buf.GetString(), this->le);
+    auto decode_data = schema.DecodeValue(decode_buf);
+
+    ASSERT_TRUE(decode_data.has_value());
+    EXPECT_EQ(data, std::any_cast<std::string>(decode_data));
   }
 
-  std::optional<std::shared_ptr<std::string>> data5 = nullopt;
-  Buf* bf5 = new Buf(1, this->le);
-  b2.EncodeValue(bf5, data5);
-  string* bs3 = bf5->GetBytes();
-  Buf* bf6 = new Buf(bs3, this->le);
-  delete bs3;
-  auto data6 = b2.DecodeValue(bf6);
-  delete bf5;
-  delete bf6;
-  EXPECT_FALSE(data6.has_value()) << "Line: " << __LINE__;
+  {
+    DingoSchema<std::string> schema;
+    schema.SetIndex(0);
+    schema.SetAllowNull(true);
+    schema.SetIsKey(false);
 
-  DingoSchema<optional<shared_ptr<string>>> b3;
-  b3.SetIndex(0);
-  b3.SetAllowNull(true);
-  b3.SetIsKey(true);
-  Buf* bf7 = new Buf(100, this->le);
-  b3.EncodeValue(bf7, nullopt);
-  string* bs4 = bf7->GetBytes();
-  Buf* bf8 = new Buf(bs4, this->le);
-  delete bs4;
-  auto data8 = b3.DecodeKey(bf8);
-  delete bf7;
-  delete bf8;
-  EXPECT_FALSE(data8.has_value()) << "Line: " << __LINE__;
-}
+    Buf encode_buf(1, this->le);
+    schema.EncodeValue(std::any(), encode_buf);
+    Buf decode_buf(encode_buf.GetString(), this->le);
+    auto decode_data = schema.DecodeValue(decode_buf);
+    EXPECT_FALSE(decode_data.has_value());
+  }
 
-TEST_F(DingoSerialTest, stringPrefixSchema) {
-  DingoSchema<std::optional<std::shared_ptr<std::string>>> b1;
-  b1.SetIndex(0);
-  b1.SetAllowNull(false);
-  b1.SetIsKey(true);
-  std::shared_ptr<std::string> s_data1 = std::make_shared<std::string>(
-      "test address test 中文 表情😊🏷️👌 test "
-      "测试测试测试三🤣😂😁🐱‍🐉👏");
-  std::optional<std::shared_ptr<std::string>> data1{s_data1};
+  {
+    DingoSchema<std::string> schema;
+    schema.SetIndex(0);
+    schema.SetAllowNull(true);
+    schema.SetIsKey(true);
+    Buf encode_buf(100, this->le);
+    schema.EncodeValue(std::any(), encode_buf);
+    Buf decode_buf(encode_buf.GetString(), this->le);
+    auto decode_data = schema.DecodeKey(decode_buf);
 
-  Buf* bf1 = new Buf(1, this->le);
-  b1.EncodeKey(bf1, data1);
-  string* bs1 = bf1->GetBytes();
-
-  Buf* bf2 = new Buf(1, this->le);
-  b1.EncodeKeyPrefix(bf2, data1);
-  string* bs2 = bf2->GetBytes();
-  string bs3(*bs1, 0, bs2->length());
-
-  delete bf1;
-  delete bf2;
-
-  EXPECT_EQ(*bs2, bs3) << "Line: " << __LINE__;
-
-  delete bs1;
-  delete bs2;
+    EXPECT_FALSE(decode_data.has_value());
+  }
 }
 
 TEST_F(DingoSerialTest, bufLeBe) {
@@ -1357,184 +1260,165 @@ TEST_F(DingoSerialTest, bufLeBe) {
   uint32_t int_atad = bswap_32(1543234);
   uint64_t long_atad = bswap_64(-8237583920453957801);
 
-  bitset<8> bit0("00000000");
-  bitset<8> bit1("00010111");
-  bitset<8> bit2("10001100");
-  bitset<8> bit3("01000010");
-  bitset<8> bit4("10001101");
-  bitset<8> bit5("10101110");
-  bitset<8> bit6("00111001");
-  bitset<8> bit7("00010001");
-  bitset<8> bit8("10100101");
-  bitset<8> bit9("11011111");
-  bitset<8> bit10("01000111");
-  bitset<8> bit11("01010111");
-  bitset<8> bit12("01000010");
-  bitset<8> bit13("10001100");
-  bitset<8> bit14("00010111");
-  bitset<8> bit15("00000000");
+  std::bitset<8> bit0("00000000");
+  std::bitset<8> bit1("00010111");
+  std::bitset<8> bit2("10001100");
+  std::bitset<8> bit3("01000010");
+  std::bitset<8> bit4("10001101");
+  std::bitset<8> bit5("10101110");
+  std::bitset<8> bit6("00111001");
+  std::bitset<8> bit7("00010001");
+  std::bitset<8> bit8("10100101");
+  std::bitset<8> bit9("11011111");
+  std::bitset<8> bit10("01000111");
+  std::bitset<8> bit11("01010111");
+  std::bitset<8> bit12("01000010");
+  std::bitset<8> bit13("10001100");
+  std::bitset<8> bit14("00010111");
+  std::bitset<8> bit15("00000000");
 
   Buf bf1(16, this->le);
   bf1.WriteInt(int_data);
   bf1.WriteLong(long_data);
-  bf1.ReverseWriteInt(int_data);
-  string* bs1 = bf1.GetBytes();
-  bitset<8> bs10(bs1->at(0));
+  // bf1.ReverseWriteInt(int_data);
+  std::string bs1 = bf1.GetString();
+  std::bitset<8> bs10(bs1.at(0));
   EXPECT_EQ(bs10, bit0);
-  bitset<8> bs11(bs1->at(1));
+  std::bitset<8> bs11(bs1.at(1));
   EXPECT_EQ(bs11, bit1);
-  bitset<8> bs12(bs1->at(2));
+  std::bitset<8> bs12(bs1.at(2));
   EXPECT_EQ(bs12, bit2);
-  bitset<8> bs13(bs1->at(3));
+  std::bitset<8> bs13(bs1.at(3));
   EXPECT_EQ(bs13, bit3);
-  bitset<8> bs14(bs1->at(4));
+  std::bitset<8> bs14(bs1.at(4));
   EXPECT_EQ(bs14, bit4);
-  bitset<8> bs15(bs1->at(5));
+  std::bitset<8> bs15(bs1.at(5));
   EXPECT_EQ(bs15, bit5);
-  bitset<8> bs16(bs1->at(6));
+  std::bitset<8> bs16(bs1.at(6));
   EXPECT_EQ(bs16, bit6);
-  bitset<8> bs17(bs1->at(7));
+  std::bitset<8> bs17(bs1.at(7));
   EXPECT_EQ(bs17, bit7);
-  bitset<8> bs18(bs1->at(8));
+  std::bitset<8> bs18(bs1.at(8));
   EXPECT_EQ(bs18, bit8);
-  bitset<8> bs19(bs1->at(9));
+  std::bitset<8> bs19(bs1.at(9));
   EXPECT_EQ(bs19, bit9);
-  bitset<8> bs110(bs1->at(10));
+  std::bitset<8> bs110(bs1.at(10));
   EXPECT_EQ(bs110, bit10);
-  bitset<8> bs111(bs1->at(11));
+  std::bitset<8> bs111(bs1.at(11));
   EXPECT_EQ(bs111, bit11);
-  bitset<8> bs112(bs1->at(12));
+  std::bitset<8> bs112(bs1.at(12));
   EXPECT_EQ(bs112, bit12);
-  bitset<8> bs113(bs1->at(13));
+  std::bitset<8> bs113(bs1.at(13));
   EXPECT_EQ(bs113, bit13);
-  bitset<8> bs114(bs1->at(14));
+  std::bitset<8> bs114(bs1.at(14));
   EXPECT_EQ(bs114, bit14);
-  bitset<8> bs115(bs1->at(15));
+  std::bitset<8> bs115(bs1.at(15));
   EXPECT_EQ(bs115, bit15);
 
   Buf bf2(bs1, this->le);
-  EXPECT_EQ(int_data, bf2.ReverseReadInt());
+  // EXPECT_EQ(int_data, bf2.ReverseReadInt());
   EXPECT_EQ(int_data, bf2.ReadInt());
   EXPECT_EQ(long_data, bf2.ReadLong());
-  delete bs1;
 
   Buf bf3(16, !this->le);
   bf3.WriteInt(int_atad);
   bf3.WriteLong(long_atad);
-  bf3.ReverseWriteInt(int_atad);
-  string* bs2 = bf3.GetBytes();
-  bitset<8> bs20(bs2->at(0));
+  // bf3.ReverseWriteInt(int_atad);
+
+  std::string bs2 = bf3.GetString();
+  std::bitset<8> bs20(bs2.at(0));
   EXPECT_EQ(bs20, bit0);
-  bitset<8> bs21(bs2->at(1));
+  std::bitset<8> bs21(bs2.at(1));
   EXPECT_EQ(bs21, bit1);
-  bitset<8> bs22(bs2->at(2));
+  std::bitset<8> bs22(bs2.at(2));
   EXPECT_EQ(bs22, bit2);
-  bitset<8> bs23(bs2->at(3));
+  std::bitset<8> bs23(bs2.at(3));
   EXPECT_EQ(bs23, bit3);
-  bitset<8> bs24(bs2->at(4));
+  std::bitset<8> bs24(bs2.at(4));
   EXPECT_EQ(bs24, bit4);
-  bitset<8> bs25(bs2->at(5));
+  std::bitset<8> bs25(bs2.at(5));
   EXPECT_EQ(bs25, bit5);
-  bitset<8> bs26(bs2->at(6));
+  std::bitset<8> bs26(bs2.at(6));
   EXPECT_EQ(bs26, bit6);
-  bitset<8> bs27(bs2->at(7));
+  std::bitset<8> bs27(bs2.at(7));
   EXPECT_EQ(bs27, bit7);
-  bitset<8> bs28(bs2->at(8));
+  std::bitset<8> bs28(bs2.at(8));
   EXPECT_EQ(bs28, bit8);
-  bitset<8> bs29(bs2->at(9));
+  std::bitset<8> bs29(bs2.at(9));
   EXPECT_EQ(bs29, bit9);
-  bitset<8> bs210(bs2->at(10));
+  std::bitset<8> bs210(bs2.at(10));
   EXPECT_EQ(bs210, bit10);
-  bitset<8> bs211(bs2->at(11));
+  std::bitset<8> bs211(bs2.at(11));
   EXPECT_EQ(bs211, bit11);
-  bitset<8> bs212(bs2->at(12));
+  std::bitset<8> bs212(bs2.at(12));
   EXPECT_EQ(bs212, bit12);
-  bitset<8> bs213(bs2->at(13));
+  std::bitset<8> bs213(bs2.at(13));
   EXPECT_EQ(bs213, bit13);
-  bitset<8> bs214(bs2->at(14));
+  std::bitset<8> bs214(bs2.at(14));
   EXPECT_EQ(bs214, bit14);
-  bitset<8> bs215(bs2->at(15));
+  std::bitset<8> bs215(bs2.at(15));
   EXPECT_EQ(bs215, bit15);
 
   Buf bf4(bs2, !this->le);
-  EXPECT_EQ(int_atad, bf4.ReverseReadInt());
+  // EXPECT_EQ(int_atad, bf4.ReverseReadInt());
   EXPECT_EQ(int_atad, bf4.ReadInt());
   EXPECT_EQ(long_atad, bf4.ReadLong());
-  delete bs2;
 }
 
 TEST_F(DingoSerialTest, recordTest) {
   InitVector();
   auto schemas = GetSchemas();
-  RecordEncoder* re = new RecordEncoder(0, schemas, 0L, this->le);
+  RecordEncoder re(0, schemas, 0L, this->le);
   InitRecord();
 
-  vector<any>* record1 = GetRecord();
+  auto record1 = GetRecord();
   std::string key, value;
-  (void)re->Encode('r', *record1, key, value);
-  delete re;
+  re.Encode('r', record1, key, value);
 
-  RecordDecoder* rd = new RecordDecoder(0, schemas, 0L, this->le);
-  vector<any> record2;
-  (void)rd->Decode(key, value, record2);
+  RecordDecoder rd(0, schemas, 0L, this->le);
+  std::vector<std::any> record2;
+  rd.Decode(key, value, record2);
   int i = 0;
-  for (const auto& bs : *schemas) {
+  for (const auto& bs : schemas) {
     BaseSchema::Type type = bs->GetType();
+    auto r1 = record1.at(i);
+    auto r2 = record2.at(i);
+
+    ASSERT_TRUE(r1.has_value() == r1.has_value());
+
     switch (type) {
       case BaseSchema::kBool: {
-        optional<bool> r1 = any_cast<optional<bool>>(record1->at(i));
-        optional<bool> r2 = any_cast<optional<bool>>(record2.at(i));
         if (r1.has_value() && r2.has_value()) {
-          EXPECT_EQ(r1.value(), r2.value());
-        } else {
-          EXPECT_FALSE(r1.has_value());
-          EXPECT_FALSE(r2.has_value());
+          EXPECT_EQ(std::any_cast<bool>(r1), std::any_cast<bool>(r2));
         }
         break;
       }
       case BaseSchema::kInteger: {
-        optional<int32_t> r1 = any_cast<optional<int32_t>>(record1->at(i));
-        optional<int32_t> r2 = any_cast<optional<int32_t>>(record2.at(i));
         if (r1.has_value() && r2.has_value()) {
-          EXPECT_EQ(r1.value(), r2.value());
-        } else {
-          EXPECT_FALSE(r1.has_value());
-          EXPECT_FALSE(r2.has_value());
+          EXPECT_EQ(std::any_cast<int32_t>(r1), std::any_cast<int32_t>(r2));
         }
+
         break;
       }
       case BaseSchema::kLong: {
-        optional<int64_t> r1 = any_cast<optional<int64_t>>(record1->at(i));
-        optional<int64_t> r2 = any_cast<optional<int64_t>>(record2.at(i));
         if (r1.has_value() && r2.has_value()) {
-          EXPECT_EQ(r1.value(), r2.value());
-        } else {
-          EXPECT_FALSE(r1.has_value());
-          EXPECT_FALSE(r2.has_value());
+          EXPECT_EQ(std::any_cast<int64_t>(r1), std::any_cast<int64_t>(r2));
         }
+
         break;
       }
       case BaseSchema::kDouble: {
-        optional<double> r1 = any_cast<optional<double>>(record1->at(i));
-        optional<double> r2 = any_cast<optional<double>>(record2.at(i));
         if (r1.has_value() && r2.has_value()) {
-          EXPECT_EQ(r1.value(), r2.value());
-        } else {
-          EXPECT_FALSE(r1.has_value());
-          EXPECT_FALSE(r2.has_value());
+          EXPECT_EQ(std::any_cast<double>(r1), std::any_cast<double>(r2));
         }
+
         break;
       }
       case BaseSchema::kString: {
-        optional<shared_ptr<string>> r1 = any_cast<optional<shared_ptr<string>>>(record1->at(i));
-        optional<shared_ptr<string>> r2 = any_cast<optional<shared_ptr<string>>>(record2.at(i));
         if (r1.has_value() && r2.has_value()) {
-          EXPECT_EQ(*r1.value(), *r2.value());
-        } else if (r2.has_value()) {
-          EXPECT_TRUE(0);
-        } else {
-          EXPECT_FALSE(r1.has_value());
+          EXPECT_EQ(std::any_cast<std::string>(r1), std::any_cast<std::string>(r2));
         }
+
         break;
       }
       default: {
@@ -1545,23 +1429,22 @@ TEST_F(DingoSerialTest, recordTest) {
   }
   // delete record2;
 
-  vector<int> index{0, 1, 3, 5};
-  vector<int> index_temp{0, 1, 3, 5};
-  vector<any> record3;
-  (void)rd->Decode(key, value, index, record3);
+  std::vector<int> index{0, 1, 3, 5};
+  std::vector<int> index_temp{0, 1, 3, 5};
+  std::vector<std::any> record3;
+  rd.Decode(key, value, index, record3);
   i = 0;
-  for (const auto& bs : *schemas) {
+  for (const auto& bs : schemas) {
     BaseSchema::Type type = bs->GetType();
     switch (type) {
       case BaseSchema::kBool: {
         if (binary_search(index_temp.begin(), index_temp.end(), bs->GetIndex())) {
-          optional<bool> r1 = any_cast<optional<bool>>(record1->at(bs->GetIndex()));
-          optional<bool> r2 = any_cast<optional<bool>>(record3.at(i));
+          auto r1 = record1.at(bs->GetIndex());
+          auto r2 = record3.at(i);
+          ASSERT_TRUE(r1.has_value() == r1.has_value());
+
           if (r1.has_value() && r2.has_value()) {
-            EXPECT_EQ(r1.value(), r2.value());
-          } else {
-            EXPECT_FALSE(r1.has_value());
-            EXPECT_FALSE(r2.has_value());
+            EXPECT_EQ(std::any_cast<bool>(r1), std::any_cast<bool>(r2));
           }
           i++;
         }
@@ -1569,13 +1452,12 @@ TEST_F(DingoSerialTest, recordTest) {
       }
       case BaseSchema::kInteger: {
         if (binary_search(index_temp.begin(), index_temp.end(), bs->GetIndex())) {
-          optional<int32_t> r1 = any_cast<optional<int32_t>>(record1->at(bs->GetIndex()));
-          optional<int32_t> r2 = any_cast<optional<int32_t>>(record3.at(i));
+          auto r1 = record1.at(bs->GetIndex());
+          auto r2 = record3.at(i);
+          ASSERT_TRUE(r1.has_value() == r1.has_value());
+
           if (r1.has_value() && r2.has_value()) {
-            EXPECT_EQ(r1.value(), r2.value());
-          } else {
-            EXPECT_FALSE(r1.has_value());
-            EXPECT_FALSE(r2.has_value());
+            EXPECT_EQ(std::any_cast<int32_t>(r1), std::any_cast<int32_t>(r2));
           }
           i++;
         }
@@ -1583,13 +1465,12 @@ TEST_F(DingoSerialTest, recordTest) {
       }
       case BaseSchema::kLong: {
         if (binary_search(index_temp.begin(), index_temp.end(), bs->GetIndex())) {
-          optional<int64_t> r1 = any_cast<optional<int64_t>>(record1->at(bs->GetIndex()));
-          optional<int64_t> r2 = any_cast<optional<int64_t>>(record3.at(i));
+          auto r1 = record1.at(bs->GetIndex());
+          auto r2 = record3.at(i);
+          ASSERT_TRUE(r1.has_value() == r1.has_value());
+
           if (r1.has_value() && r2.has_value()) {
-            EXPECT_EQ(r1.value(), r2.value());
-          } else {
-            EXPECT_FALSE(r1.has_value());
-            EXPECT_FALSE(r2.has_value());
+            EXPECT_EQ(std::any_cast<int64_t>(r1), std::any_cast<int64_t>(r2));
           }
           i++;
         }
@@ -1597,13 +1478,12 @@ TEST_F(DingoSerialTest, recordTest) {
       }
       case BaseSchema::kDouble: {
         if (binary_search(index_temp.begin(), index_temp.end(), bs->GetIndex())) {
-          optional<double> r1 = any_cast<optional<double>>(record1->at(bs->GetIndex()));
-          optional<double> r2 = any_cast<optional<double>>(record3.at(i));
+          auto r1 = record1.at(bs->GetIndex());
+          auto r2 = record3.at(i);
+          ASSERT_TRUE(r1.has_value() == r1.has_value());
+
           if (r1.has_value() && r2.has_value()) {
-            EXPECT_EQ(r1.value(), r2.value());
-          } else {
-            EXPECT_FALSE(r1.has_value());
-            EXPECT_FALSE(r2.has_value());
+            EXPECT_EQ(std::any_cast<double>(r1), std::any_cast<double>(r2));
           }
           i++;
         }
@@ -1611,14 +1491,12 @@ TEST_F(DingoSerialTest, recordTest) {
       }
       case BaseSchema::kString: {
         if (binary_search(index_temp.begin(), index_temp.end(), bs->GetIndex())) {
-          optional<shared_ptr<string>> r1 = any_cast<optional<shared_ptr<string>>>(record1->at(bs->GetIndex()));
-          optional<shared_ptr<string>> r2 = any_cast<optional<shared_ptr<string>>>(record3.at(i));
+          auto r1 = record1.at(bs->GetIndex());
+          auto r2 = record3.at(i);
+          ASSERT_TRUE(r1.has_value() == r1.has_value());
+
           if (r1.has_value() && r2.has_value()) {
-            EXPECT_EQ(*r1.value(), *r2.value());
-          } else if (r2.has_value()) {
-            EXPECT_TRUE(0);
-          } else {
-            EXPECT_FALSE(r1.has_value());
+            EXPECT_EQ(std::any_cast<std::string>(r1), std::any_cast<std::string>(r2));
           }
           i++;
         }
@@ -1632,7 +1510,4 @@ TEST_F(DingoSerialTest, recordTest) {
 
   DeleteSchemas();
   DeleteRecords();
-  // delete record3;
-  // delete kv;
-  delete rd;
 }

@@ -15,21 +15,22 @@
 #ifndef DINGO_SERIAL_BASE_SCHEMA_H_
 #define DINGO_SERIAL_BASE_SCHEMA_H_
 
+#include <any>
 #include <cstdint>
+#include <memory>
 #include <string>
+
+#include "serial/buf.h"
 
 namespace dingodb {
 
+class BaseSchema;
+using BaseSchemaPtr = std::shared_ptr<BaseSchema>;
+
 class BaseSchema {
- protected:
-  const uint8_t k_null = 0;
-  const uint8_t k_not_null = 1;
-
- private:
-  std::string name_;
-
  public:
   virtual ~BaseSchema() = default;
+
   enum Type {
     kBool,
     kInteger,
@@ -44,13 +45,7 @@ class BaseSchema {
     kDoubleList,
     kStringList
   };
-  virtual Type GetType() = 0;
-  virtual bool AllowNull() = 0;
-  virtual int GetLength() = 0;
-  virtual bool IsKey() = 0;
-  virtual int GetIndex() = 0;
-  void SetName(const std::string& name) { name_ = name; }
-  const std::string& GetName() const { return name_; }
+
   static const char* GetTypeString(Type type) {
     switch (type) {
       case kBool:
@@ -81,6 +76,45 @@ class BaseSchema {
         return "unknown";
     }
   }
+
+  virtual Type GetType() = 0;
+  virtual int GetLength() = 0;
+
+  virtual BaseSchemaPtr Clone() = 0;
+
+  bool IsLe() const { return le_; }
+  bool AllowNull() const { return allow_null_; }
+  bool IsKey() const { return is_key_; }
+  int GetIndex() const { return index_; }
+
+  void SetName(const std::string& name) { name_ = name; }
+  const std::string& GetName() const { return name_; }
+
+  void SetIndex(int index) { index_ = index; }
+  void SetIsLe(bool le) { le_ = le; }
+  void SetIsKey(bool is_key) { is_key_ = is_key; }
+  void SetAllowNull(bool allow_null) { allow_null_ = allow_null; }
+
+  virtual int SkipKey(Buf& buf) = 0;
+  virtual int SkipValue(Buf& buf) = 0;
+
+  virtual int EncodeKey(const std::any& data, Buf& buf) = 0;
+  virtual int EncodeValue(const std::any& data, Buf& buf) = 0;
+
+  virtual std::any DecodeKey(Buf& buf) = 0;
+  virtual std::any DecodeValue(Buf& buf) = 0;
+
+ protected:
+  const uint8_t k_null = 0;
+  const uint8_t k_not_null = 1;
+
+ private:
+  std::string name_;
+
+  bool le_{true};
+  bool is_key_{false};
+  bool allow_null_{false};
+  int index_;
 };
 
 }  // namespace dingodb

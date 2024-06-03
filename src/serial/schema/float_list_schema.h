@@ -21,41 +21,30 @@
 #include <optional>
 #include <vector>
 
-#include "serial/schema/dingo_schema.h"
+#include "dingo_schema.h"
 
 namespace dingodb {
 
 template <>
-
-class DingoSchema<std::optional<std::shared_ptr<std::vector<float>>>> : public BaseSchema {
- private:
-  int index_;
-  bool key_, allow_null_;
-  bool le_ = true;
-
-  static int GetDataLength();
-  static int GetWithNullTagLength();
-  static void LeInternalEncodeValue(Buf* buf, float data);
-  static void BeInternalEncodeValue(Buf* buf, float data);
-
+class DingoSchema<std::vector<float>> : public BaseSchema {
  public:
-  Type GetType() override;
-  bool AllowNull() override;
+  Type GetType() override { return kFloatList; }
   int GetLength() override;
-  bool IsKey() override;
-  int GetIndex() override;
-  void SetIndex(int index);
-  void SetIsKey(bool key);
-  void SetAllowNull(bool allow_null);
-  void SetIsLe(bool le);
-  static void EncodeKey(Buf* buf, std::optional<std::shared_ptr<std::vector<float>>> data);
-  static void EncodeKeyPrefix(Buf* buf, std::optional<std::shared_ptr<std::vector<float>>> data);
-  static std::optional<std::shared_ptr<std::vector<float>>> DecodeKey(Buf* buf);
-  static void SkipKey(Buf* buf);
-  float InternalDecodeData(Buf* buf) const;
-  void EncodeValue(Buf* buf, std::optional<std::shared_ptr<std::vector<float>>> data);
-  std::optional<std::shared_ptr<std::vector<float>>> DecodeValue(Buf* buf);
-  void SkipValue(Buf* buf);
+
+  BaseSchemaPtr Clone() override { return std::make_shared<DingoSchema<std::vector<float>>>(); }
+
+  int SkipKey(Buf& buf) override;
+  int SkipValue(Buf& buf) override;
+
+  int EncodeKey(const std::any& data, Buf& buf) override;
+  int EncodeValue(const std::any& data, Buf& buf) override;
+
+  std::any DecodeKey(Buf& buf) override;
+  std::any DecodeValue(Buf& buf) override;
+
+ private:
+  void EncodeFloatList(const std::vector<float>& data, Buf& buf);
+  void DecodeFloatList(Buf& buf, std::vector<float>& data);
 };
 
 }  // namespace dingodb

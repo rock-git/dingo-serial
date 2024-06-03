@@ -12,184 +12,211 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "serial/buf.h"
+#include "buf.h"
 
-#include "serial/utils.h"
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <string>
+
+#include "serial/compiler.h"
 
 namespace dingodb {
 
-Buf::Buf(int size) {
-  Init(size);
-  this->le_ = IsLE();
-}
+Buf::Buf(size_t capacity, bool le) : le_(le) { buf_.reserve(capacity); }
 
-Buf::Buf(int size, bool le) {
-  Init(size);
-  this->le_ = le;
-}
+Buf::Buf(size_t capacity) : Buf(capacity, true) {}
 
-Buf::Buf(std::string* buf) {
-  Init(buf);
-  this->le_ = IsLE();
-}
+Buf::Buf(const std::string& s, bool le) : le_(le) { buf_ = s; }
 
-Buf::Buf(std::string* buf, bool le) {
-  Init(buf);
-  this->le_ = le;
-}
+Buf::Buf(const std::string& s) : Buf(s, true) {}
 
-Buf::Buf(const std::string& buf) {
-  Init(buf);
-  this->le_ = IsLE();
-}
+Buf::Buf(std::string&& s, bool le) : le_(le) { buf_.swap(s); }
 
-Buf::Buf(const std::string& buf, bool le) {
-  Init(buf);
-  this->le_ = le;
-}
+Buf::Buf(std::string&& s) : Buf(s, true) {}
 
-Buf::~Buf() { this->buf_.clear(); }
+void Buf::Write(uint8_t data) { buf_.push_back(data); }
 
-void Buf::Init(int size) {
-  this->buf_.resize(size);
-  this->reverse_pos_ = size - 1;
-}
+void Buf::WriteWithNegation(uint8_t data) { buf_.push_back(~data); }
 
-void Buf::Init(std::string* buf) {
-  this->buf_.resize(buf->size());
-  this->buf_.assign(buf->begin(), buf->end());
-  this->reverse_pos_ = this->buf_.size() - 1;
-}
+void Buf::WriteInt(int32_t data) {
+  size_t curr_size = buf_.size();
+  buf_.resize(curr_size + 4);
 
-void Buf::Init(const std::string& buf) {
-  this->buf_.resize(buf.size());
-  this->buf_.assign(buf.begin(), buf.end());
-  this->reverse_pos_ = this->buf_.size() - 1;
-}
-
-void Buf::SetForwardPos(int fp) { this->forward_pos_ = fp; }
-
-void Buf::SetReversePos(int rp) { this->reverse_pos_ = rp; }
-
-void Buf::Write(uint8_t b) { buf_.at(forward_pos_++) = b; }
-
-void Buf::WriteWithNegation(uint8_t b) { buf_.at(forward_pos_++) = ~b; }
-
-void Buf::Write(const std::string& data) {
-  for (auto it : data) {
-    buf_.at(forward_pos_++) = it;
-  }
-}
-
-void Buf::WriteInt(int32_t i) {
-  uint32_t* ii = (uint32_t*)&i;
-  if (this->le_) {
-    Write(*ii >> 24);
-    Write(*ii >> 16);
-    Write(*ii >> 8);
-    Write(*ii);
+  char* buf = buf_.data();
+  uint8_t* i = (uint8_t*)&data;
+  if (DINGO_LIKELY(this->le_)) {
+    buf[curr_size] = *(i + 3);
+    buf[curr_size + 1] = *(i + 2);
+    buf[curr_size + 2] = *(i + 1);
+    buf[curr_size + 3] = *i;
   } else {
-    Write(*ii);
-    Write(*ii >> 8);
-    Write(*ii >> 16);
-    Write(*ii >> 24);
+    buf[curr_size] = *i;
+    buf[curr_size + 1] = *(i + 1);
+    buf[curr_size + 2] = *(i + 2);
+    buf[curr_size + 3] = *(i + 3);
   }
 }
 
-void Buf::WriteLong(int64_t l) {
-  uint64_t* ll = (uint64_t*)&l;
-  if (this->le_) {
-    Write(*ll >> 56);
-    Write(*ll >> 48);
-    Write(*ll >> 40);
-    Write(*ll >> 32);
-    Write(*ll >> 24);
-    Write(*ll >> 16);
-    Write(*ll >> 8);
-    Write(*ll);
+void Buf::WriteInt(size_t pos, int32_t data) {
+  if (DINGO_UNLIKELY(pos + 4 >= buf_.size())) {
+    throw std::runtime_error("Out of range.");
+  }
+
+  char* buf = buf_.data();
+  uint8_t* i = (uint8_t*)&data;
+  if (DINGO_LIKELY(this->le_)) {
+    buf[pos] = *(i + 3);
+    buf[pos + 1] = *(i + 2);
+    buf[pos + 2] = *(i + 1);
+    buf[pos + 3] = *i;
   } else {
-    Write(*ll);
-    Write(*ll >> 8);
-    Write(*ll >> 16);
-    Write(*ll >> 24);
-    Write(*ll >> 32);
-    Write(*ll >> 40);
-    Write(*ll >> 48);
-    Write(*ll >> 56);
+    buf[pos] = *i;
+    buf[pos + 1] = *(i + 1);
+    buf[pos + 2] = *(i + 2);
+    buf[pos + 3] = *(i + 3);
   }
 }
 
-void Buf::WriteLongWithNegation(int64_t l) {
-  uint64_t* ll = (uint64_t*)&l;
-  if (this->le_) {
-    WriteWithNegation(*ll >> 56);
-    WriteWithNegation(*ll >> 48);
-    WriteWithNegation(*ll >> 40);
-    WriteWithNegation(*ll >> 32);
-    WriteWithNegation(*ll >> 24);
-    WriteWithNegation(*ll >> 16);
-    WriteWithNegation(*ll >> 8);
-    WriteWithNegation(*ll);
+void Buf::WriteLong(int64_t data) {
+  uint8_t* i = (uint8_t*)&data;
+  if (DINGO_LIKELY(this->le_)) {
+    buf_.push_back(*(i + 7));
+    buf_.push_back(*(i + 6));
+    buf_.push_back(*(i + 5));
+    buf_.push_back(*(i + 4));
+    buf_.push_back(*(i + 3));
+    buf_.push_back(*(i + 2));
+    buf_.push_back(*(i + 1));
+    buf_.push_back(*i);
   } else {
-    WriteWithNegation(*ll);
-    WriteWithNegation(*ll >> 8);
-    WriteWithNegation(*ll >> 16);
-    WriteWithNegation(*ll >> 24);
-    WriteWithNegation(*ll >> 32);
-    WriteWithNegation(*ll >> 40);
-    WriteWithNegation(*ll >> 48);
-    WriteWithNegation(*ll >> 56);
+    buf_.push_back(*i);
+    buf_.push_back(*(i + 1));
+    buf_.push_back(*(i + 2));
+    buf_.push_back(*(i + 3));
+    buf_.push_back(*(i + 4));
+    buf_.push_back(*(i + 5));
+    buf_.push_back(*(i + 6));
+    buf_.push_back(*(i + 7));
   }
 }
 
-void Buf::ReverseWrite(uint8_t b) { buf_.at(reverse_pos_--) = b; }
+void Buf::WriteLongWithNegation(int64_t data) {
+  uint8_t* i = (uint8_t*)&data;
+  if (DINGO_LIKELY(this->le_)) {
+    buf_.push_back(~*(i + 7));
+    buf_.push_back(~*(i + 6));
+    buf_.push_back(~*(i + 5));
+    buf_.push_back(~*(i + 4));
+    buf_.push_back(~*(i + 3));
+    buf_.push_back(~*(i + 2));
+    buf_.push_back(~*(i + 1));
+    buf_.push_back(~*i);
 
-void Buf::ReverseWriteInt(int32_t i) {
-  uint32_t* ii = (uint32_t*)&i;
-  if (this->le_) {
-    ReverseWrite(*ii >> 24);
-    ReverseWrite(*ii >> 16);
-    ReverseWrite(*ii >> 8);
-    ReverseWrite(*ii);
   } else {
-    ReverseWrite(*ii);
-    ReverseWrite(*ii >> 8);
-    ReverseWrite(*ii >> 16);
-    ReverseWrite(*ii >> 24);
+    buf_.push_back(~*i);
+    buf_.push_back(~*(i + 1));
+    buf_.push_back(~*(i + 2));
+    buf_.push_back(~*(i + 3));
+    buf_.push_back(~*(i + 4));
+    buf_.push_back(~*(i + 5));
+    buf_.push_back(~*(i + 6));
+    buf_.push_back(~*(i + 7));
   }
 }
 
-uint8_t Buf::Peek() { return buf_.at(forward_pos_); }
+void Buf::WriteLongWithFirstBitNegation(int64_t data) {
+  uint8_t* i = (uint8_t*)&data;
+  if (DINGO_LIKELY(this->le_)) {
+    buf_.push_back(*(i + 7) ^ 0x80);
+    buf_.push_back(*(i + 6));
+    buf_.push_back(*(i + 5));
+    buf_.push_back(*(i + 4));
+    buf_.push_back(*(i + 3));
+    buf_.push_back(*(i + 2));
+    buf_.push_back(*(i + 1));
+    buf_.push_back(*i);
+
+  } else {
+    buf_.push_back(*i ^ 0x80);
+    buf_.push_back(*(i + 1));
+    buf_.push_back(*(i + 2));
+    buf_.push_back(*(i + 3));
+    buf_.push_back(*(i + 4));
+    buf_.push_back(*(i + 5));
+    buf_.push_back(*(i + 6));
+    buf_.push_back(*(i + 7));
+  }
+}
+
+void Buf::WriteString(const std::string& data) {
+  size_t curr_size = buf_.size();
+  buf_.resize(curr_size + data.size());
+
+  memcpy(buf_.data() + curr_size, data.data(), data.size());
+}
+
+uint8_t Buf::Peek() { return buf_.at(read_offset_); }
 
 int32_t Buf::PeekInt() {
-  if (this->le_) {
-    return ((buf_.at(forward_pos_) & 0xFF) << 24) | ((buf_.at(forward_pos_ + 1) & 0xFF) << 16) |
-           ((buf_.at(forward_pos_ + 2) & 0xFF) << 8) | (buf_.at(forward_pos_ + 3) & 0xFF);
+  if (DINGO_LIKELY(this->le_)) {
+    char* buf = buf_.data();
+    return ((buf[read_offset_] & 0xFF) << 24) | ((buf[read_offset_ + 1] & 0xFF) << 16) |
+           ((buf[read_offset_ + 2] & 0xFF) << 8) | (buf[read_offset_ + 3] & 0xFF);
   } else {
-    return ((buf_.at(forward_pos_) & 0xFF) | ((buf_.at(forward_pos_ + 1) & 0xFF) << 8) |
-            ((buf_.at(forward_pos_ + 2) & 0xFF) << 16) | ((buf_.at(forward_pos_ + 3) & 0xFF) << 24));
+    char* buf = buf_.data();
+    return ((buf[read_offset_] & 0xFF) | ((buf[read_offset_ + 1] & 0xFF) << 8) |
+            ((buf[read_offset_ + 2] & 0xFF) << 16) | ((buf[read_offset_ + 3] & 0xFF) << 24));
   }
 }
 
 int64_t Buf::PeekLong() {
-  uint64_t l = (buf_.at(forward_pos_)) & 0xFF;
-  if (this->le_) {
-    for (int i = 0; i < 7; i++) {
-      l <<= 8;
-      l |= (buf_.at(forward_pos_ + i + 1)) & 0xFF;
-    }
+  char* buf = buf_.data();
+  uint64_t l = 0;
+  if (DINGO_LIKELY(this->le_)) {
+    l |= buf[read_offset_];
+    l <<= 8;
+    l |= buf[read_offset_ + 1];
+    l <<= 8;
+    l |= buf[read_offset_ + 2];
+    l <<= 8;
+    l |= buf[read_offset_ + 3];
+    l <<= 8;
+    l |= buf[read_offset_ + 4];
+    l <<= 8;
+    l |= buf[read_offset_ + 5];
+    l <<= 8;
+    l |= buf[read_offset_ + 6];
+    l <<= 8;
+    l |= buf[read_offset_ + 7];
+
   } else {
-    for (int i = 1; i < 8; i++) {
-      l |= (((uint64_t)(buf_.at(forward_pos_ + i)) & 0xFF) << (8 * i));
-    }
+    l |= buf[read_offset_ + 7];
+    l <<= 8;
+    l |= buf[read_offset_ + 6];
+    l <<= 8;
+    l |= buf[read_offset_ + 5];
+    l <<= 8;
+    l |= buf[read_offset_ + 4];
+    l <<= 8;
+    l |= buf[read_offset_ + 3];
+    l <<= 8;
+    l |= buf[read_offset_ + 2];
+    l <<= 8;
+    l |= buf[read_offset_ + 1];
+    l <<= 8;
+    l |= buf[read_offset_];
   }
   return l;
 }
 
-uint8_t Buf::Read() { return buf_.at(forward_pos_++); }
+uint8_t Buf::Read() { return buf_.at(read_offset_++); }
+
+uint8_t Buf::Read(size_t pos) { return buf_.at(pos); }
 
 int32_t Buf::ReadInt() {
-  if (this->le_) {
+  if (DINGO_LIKELY(this->le_)) {
     return ((Read() & 0xFF) << 24) | ((Read() & 0xFF) << 16) | ((Read() & 0xFF) << 8) | (Read() & 0xFF);
   } else {
     return (Read() & 0xFF) | ((Read() & 0xFF) << 8) | ((Read() & 0xFF) << 16) | ((Read() & 0xFF) << 24);
@@ -198,7 +225,7 @@ int32_t Buf::ReadInt() {
 
 int64_t Buf::ReadLong() {
   uint64_t l = Read() & 0xFF;
-  if (this->le_) {
+  if (DINGO_LIKELY(this->le_)) {
     for (int i = 0; i < 7; i++) {
       l <<= 8;
       l |= Read() & 0xFF;
@@ -211,101 +238,34 @@ int64_t Buf::ReadLong() {
   return l;
 }
 
-std::string Buf::ReadString() {
-  int internal_forward_pos = forward_pos_;
-  forward_pos_ = buf_.size();
-  return std::string(buf_.begin() + internal_forward_pos, buf_.end());
-}
-
-uint8_t Buf::ReverseRead() { return buf_.at(reverse_pos_--); }
-
-int32_t Buf::ReverseReadInt() {
-  if (this->le_) {
-    return ((ReverseRead() & 0xFF) << 24) | ((ReverseRead() & 0xFF) << 16) | ((ReverseRead() & 0xFF) << 8) |
-           (ReverseRead() & 0xFF);
+int64_t Buf::ReadLongWithFirstBitNegation() {
+  uint64_t l = (Read() & 0xFF) ^ 0x80;
+  if (IsLe()) {
+    for (int i = 0; i < 7; i++) {
+      l <<= 8;
+      l |= Read() & 0xFF;
+    }
   } else {
-    return (ReverseRead() & 0xFF) | ((ReverseRead() & 0xFF) << 8) | ((ReverseRead() & 0xFF) << 16) |
-           ((ReverseRead() & 0xFF) << 24);
+    for (int i = 1; i < 8; i++) {
+      l |= (((uint64_t)Read() & 0xFF) << (8 * i));
+    }
   }
+
+  return l;
 }
 
-void Buf::ReverseSkipInt() { reverse_pos_ -= 4; }
-
-void Buf::Skip(int size) { forward_pos_ += size; }
-
-void Buf::ReverseSkip(int size) { reverse_pos_ -= size; }
-
-void Buf::EnsureRemainder(int length) {
-  if ((forward_pos_ + length - 1) > reverse_pos_) {
-    int new_size;
-    if (length > 100) {
-      new_size = buf_.size() + length;
-    } else {
-      new_size = buf_.size() + 100;
-    }
-    std::string new_buf;
-    new_buf.resize(new_size);
-    for (int i = 0; i < forward_pos_; i++) {
-      new_buf.at(i) = buf_.at(i);
-    }
-    int reverse_size = buf_.size() - reverse_pos_ - 1;
-    int buf_start = reverse_pos_ + 1;
-    int new_buf_start = new_size - reverse_size;
-    for (int i = 0; i < reverse_size; i++) {
-      new_buf.at(new_buf_start + i) = buf_.at(buf_start + i);
-    }
-    reverse_pos_ = new_size - reverse_size - 1;
-    buf_ = new_buf;
+void Buf::Skip(size_t size) {
+  if (DINGO_UNLIKELY(read_offset_ + size > buf_.size())) {
+    throw std::runtime_error("Out of range.");
   }
+
+  read_offset_ += size;
 }
 
-std::string* Buf::GetBytes() {
-  std::string* s = new std::string();
-  int ret = GetBytes(*s);
-  if (ret < 0) {
-    delete s;
-    return nullptr;
-  }
-  return s;
-}
+const std::string& Buf::GetString() { return buf_; }
 
-int Buf::GetBytes(std::string& s) {
-  int empty_size = reverse_pos_ - forward_pos_ + 1;
-  if (empty_size == 0) {
-    s.resize(buf_.size());
-    copy(buf_.begin(), buf_.end(), s.begin());
+void Buf::GetString(std::string& s) { s.swap(buf_); }
 
-    return buf_.size();
-  }
-  if (empty_size > 0) {
-    int final_size = buf_.size() - empty_size;
-    s.resize(final_size);
-    for (int i = 0; i < forward_pos_; i++) {
-      s[i] = buf_.at(i);
-    }
-    int curr = reverse_pos_ + 1;
-    for (int i = forward_pos_; i < final_size; i++) {
-      s[i] = buf_.at(curr++);
-    }
-    return final_size;
-  }
-
-  if (empty_size < 0) {
-    //"Wrong Key Buf"
-    return -1;
-  }
-
-  return 0;
-}
-
-std::string Buf::GetString() {
-  std::string s;
-  GetBytes(s);
-  return s;
-}
-
-bool Buf::IsLe() const { return this->le_; }
-
-bool Buf::IsEnd() const { return (reverse_pos_ - forward_pos_ + 1) == 0; }
+void Buf::GetString(std::string* s) { s->swap(buf_); }
 
 }  // namespace dingodb

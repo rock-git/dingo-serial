@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "serial/utils.h"
+#include "utils.h"
 
 #include <cstdint>
 #include <memory>
@@ -22,123 +22,56 @@
 
 namespace dingodb {
 
-void SortSchema(std::shared_ptr<std::vector<std::shared_ptr<BaseSchema>>> schemas) {
-  int flag = 1;
-  for (unsigned long i = 0; i < schemas->size() - flag; i++) {
-    auto bs = schemas->at(i);
+void SortSchema(std::vector<BaseSchemaPtr>& schemas) {
+  uint32_t flag = 1;
+  for (uint32_t i = 0; i < schemas.size() - flag; i++) {
+    auto bs = schemas.at(i);
     if (bs != nullptr) {
       if ((!bs->IsKey()) && (bs->GetLength() == 0)) {
-        auto target = schemas->size() - flag++;
-        auto ts = schemas->at(target);
+        int32_t target = schemas.size() - flag++;
+        auto ts = schemas.at(target);
         while ((ts->GetLength() == 0) || ts->IsKey()) {
           target--;
-          if (target == i) {
+          if (static_cast<uint32_t>(target) == i) {
             return;
           }
           flag++;
         }
-        schemas->at(i) = ts;
-        schemas->at(target) = bs;
+        schemas.at(i) = ts;
+        schemas.at(target) = bs;
       }
     }
   }
 }
 
-void FormatSchema(std::shared_ptr<std::vector<std::shared_ptr<BaseSchema>>> schemas, bool le) {
-  for (auto& bs : *schemas) {
-    if (bs != nullptr) {
-      BaseSchema::Type type = bs->GetType();
-      switch (type) {
-        case BaseSchema::kInteger: {
-          auto is = std::dynamic_pointer_cast<DingoSchema<std::optional<int32_t>>>(bs);
-          is->SetIsLe(le);
-          break;
-        }
-        case BaseSchema::kLong: {
-          auto ls = std::dynamic_pointer_cast<DingoSchema<std::optional<int64_t>>>(bs);
-          ls->SetIsLe(le);
-          break;
-        }
-        case BaseSchema::kDouble: {
-          auto ds = std::dynamic_pointer_cast<DingoSchema<std::optional<double>>>(bs);
-          ds->SetIsLe(le);
-          break;
-        }
-        case BaseSchema::kIntegerList: {
-          auto ds = std::dynamic_pointer_cast<DingoSchema<std::optional<std::shared_ptr<std::vector<int32_t>>>>>(bs);
-          ds->SetIsLe(le);
-          break;
-        }
-        case BaseSchema::kLongList: {
-          auto ds = std::dynamic_pointer_cast<DingoSchema<std::optional<std::shared_ptr<std::vector<int64_t>>>>>(bs);
-          ds->SetIsLe(le);
-          break;
-        }
-        case BaseSchema::kDoubleList: {
-          auto ds = std::dynamic_pointer_cast<DingoSchema<std::optional<std::shared_ptr<std::vector<double>>>>>(bs);
-          ds->SetIsLe(le);
-          break;
-        }
-        default: {
-          break;
-        }
-      }
+void FormatSchema(std::vector<BaseSchemaPtr>& schemas, bool le) {
+  for (auto& schema : schemas) {
+    if (schema != nullptr) {
+      schema->SetIsLe(le);
     }
   }
 }
 
-int32_t* GetApproPerRecordSize(std::shared_ptr<std::vector<std::shared_ptr<BaseSchema>>> schemas) {
-  int32_t key_size = 8;
-  int32_t value_size = 0;
-
-  for (const auto& bs : *schemas) {
-    if (bs != nullptr) {
-      if (bs->IsKey()) {
-        key_size += (bs->GetLength() == 0 ? 100 : bs->GetLength());
-      } else {
-        value_size += (bs->GetLength() == 0 ? 100 : bs->GetLength());
-      }
-    }
-  }
-
-  int32_t* size = new int32_t[2]();
-  size[0] = key_size;
-  size[1] = value_size;
-
-  return size;
-}
-
-bool VectorFindAndRemove(std::vector<int>* v, int t) {
-  for (std::vector<int>::iterator it = v->begin(); it != v->end(); it++) {
+bool VectorFindAndRemove(std::vector<int>& vec, int t) {
+  for (auto it = vec.begin(); it != vec.end(); ++it) {
     if (*it == t) {
-      v->erase(it);
+      vec.erase(it);
       return true;
     }
   }
   return false;
 }
 
-// bool VectorFind(const std::vector<int>& v, int t) {
-//   for (int it : v) {
-//     if (it == t) {
-//       return true;
-//     }
-//   }
-//   return false;
-// }
-
-// bool VectorFind(const std::vector<int>& v, int t) {
-//   return std::binary_search(v.begin(), v.end(), t);
-// }
-
-// bool VectorFind(const std::vector<int>& v, int t, int n) {
-//   return v[n] == t;
-// }
-
 bool IsLE() {
   uint32_t i = 1;
   char* c = (char*)&i;
   return *c == 1;
 }
+
+bool StringToBool(const std::string& str) { return !(str == "0" || str == "false"); }
+int32_t StringToInt32(const std::string& str) { return std::strtol(str.c_str(), nullptr, 10); }
+int64_t StringToInt64(const std::string& str) { return std::strtoll(str.c_str(), nullptr, 10); }
+float StringToFloat(const std::string& str) { return std::strtof(str.c_str(), nullptr); }
+double StringToDouble(const std::string& str) { return std::strtod(str.c_str(), nullptr); }
 
 }  // namespace dingodb

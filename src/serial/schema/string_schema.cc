@@ -12,213 +12,172 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "serial/schema/string_schema.h"
+#include "string_schema.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
+
+#include "serial/compiler.h"
 
 namespace dingodb {
 
-int DingoSchema<std::optional<std::shared_ptr<std::string>>>::GetDataLength() { return 0; }
+const int kGroupSize = 8;
+const int kPadGroupSize = 9;
+const uint8_t kMarker = 255;
 
-int DingoSchema<std::optional<std::shared_ptr<std::string>>>::GetWithNullTagLength() { return 0; }
-
-int DingoSchema<std::optional<std::shared_ptr<std::string>>>::InternalEncodeKey(Buf* buf,
-                                                                                std::shared_ptr<std::string> data) {
-  int group_num = data->length() / 8;
-  int size = (group_num + 1) * 9;
-  int remainder_size = data->length() % 8;
-  int remainder_zero;
-  if (remainder_size == 0) {
-    remainder_size = 8;
-    remainder_zero = 8;
-  } else {
-    remainder_zero = 8 - remainder_size;
-  }
-  buf->EnsureRemainder(size + 4);
-  int curr = 0;
-  for (int i = 0; i < group_num; i++) {
-    for (int j = 0; j < 8; j++) {
-      buf->Write(data->at(curr++));
-    }
-    buf->Write((uint8_t)255);
-  }
-  if (remainder_size < 8) {
-    for (int j = 0; j < remainder_size; j++) {
-      buf->Write(data->at(curr++));
+int DingoSchema<std::string>::EncodeBytesComparable(const std::string& data, Buf& buf) {
+  for (uint32_t i = 0; i < data.size(); ++i) {
+    buf.Write(data.at(i));
+    if ((i + 1) % kGroupSize == 0) {
+      buf.Write(kMarker);
     }
   }
-  for (int i = 0; i < remainder_zero; i++) {
-    buf->Write((uint8_t)0);
+
+  int group_num = data.size() / kGroupSize + 1;
+  int pad_count = group_num * kGroupSize - data.size();
+  for (int i = 0; i < pad_count; ++i) {
+    buf.Write(0);
   }
-  buf->Write((uint8_t)(255 - remainder_zero));
+  buf.Write(kMarker - pad_count);
+
+  return group_num * 9;
+}
+
+int DingoSchema<std::string>::DecodeBytesComparable(Buf& buf, std::string& data) {
+  if (DINGO_UNLIKELY(buf.RestReadableSize() % kPadGroupSize != 0)) {
+    return -1;
+  }
+
+  int size = 0;
+  for (;;) {
+    if (buf.RestReadableSize() < kPadGroupSize) {
+      return -1;
+    }
+
+    uint8_t marker = buf.Read(buf.ReadOffset() + kGroupSize);
+
+    int pad_count = kMarker - marker;
+    for (int i = 0; i < kGroupSize - pad_count; ++i) {
+      data.push_back(buf.Read());
+    }
+
+    size += kPadGroupSize;
+    if (pad_count != 0) {
+      for (int i = 0; i < pad_count; ++i) {
+        if (buf.Read() != 0) {
+          return -1;
+        }
+      }
+      buf.Skip(1);  // skip marker
+
+      break;
+    }
+
+    buf.Skip(1);  // skip marker
+  }
+
   return size;
 }
 
-void DingoSchema<std::optional<std::shared_ptr<std::string>>>::InternalEncodeValue(Buf* buf,
-                                                                                   std::shared_ptr<std::string> data) {
-  buf->EnsureRemainder(data->length() + 4);
-  buf->WriteInt(data->length());
-  buf->Write(*data);
+int DingoSchema<std::string>::EncodeBytesNotComparable(const std::string& data, Buf& buf) {
+  buf.WriteInt(data.size());
+  buf.WriteString(data);
+
+  return data.size() + 4;
 }
 
-BaseSchema::Type DingoSchema<std::optional<std::shared_ptr<std::string>>>::GetType() { return kString; }
-
-void DingoSchema<std::optional<std::shared_ptr<std::string>>>::SetIndex(int index) { this->index_ = index; }
-
-int DingoSchema<std::optional<std::shared_ptr<std::string>>>::GetIndex() { return this->index_; }
-
-void DingoSchema<std::optional<std::shared_ptr<std::string>>>::SetIsKey(bool key) { this->key_ = key; }
-
-bool DingoSchema<std::optional<std::shared_ptr<std::string>>>::IsKey() { return this->key_; }
-
-int DingoSchema<std::optional<std::shared_ptr<std::string>>>::GetLength() {
-  if (this->allow_null_) {
-    return GetWithNullTagLength();
+void DingoSchema<std::string>::DecodeBytesNotComparable(Buf& buf, std::string& data) {
+  int size = buf.ReadInt();
+  data.resize(size);
+  for (int i = 0; i < size; ++i) {
+    data[i] = buf.Read();
   }
-  return GetDataLength();
 }
 
-void DingoSchema<std::optional<std::shared_ptr<std::string>>>::SetAllowNull(bool allow_null) {
-  this->allow_null_ = allow_null;
+int DingoSchema<std::string>::GetLength() { throw std::runtime_error("String unsupport length"); }
+
+int DingoSchema<std::string>::SkipKey(Buf& buf) {
+  if (buf.Read() == k_null) {
+    return 1;
+  }
+
+  std::string data(1024, 0);
+  int size = DecodeBytesComparable(buf, data);
+  if (size == -1) {
+    throw std::runtime_error("decode comparable string error.");
+  }
+
+  return size;
 }
 
-bool DingoSchema<std::optional<std::shared_ptr<std::string>>>::AllowNull() { return this->allow_null_; }
+int DingoSchema<std::string>::SkipValue(Buf& buf) {
+  if (buf.Read() == k_null) {
+    return 1;
+  }
 
-void DingoSchema<std::optional<std::shared_ptr<std::string>>>::EncodeKey(
-    Buf* buf, std::optional<std::shared_ptr<std::string>> data) {
-  if (this->allow_null_) {
-    if (data.has_value()) {
-      buf->EnsureRemainder(1);
-      buf->Write(k_not_null);
-      int size = InternalEncodeKey(buf, data.value());
-      buf->EnsureRemainder(4);
-      buf->ReverseWriteInt(size);
-    } else {
-      buf->EnsureRemainder(5);
-      buf->Write(k_null);
-      buf->ReverseWriteInt(0);
-    }
+  int size = buf.ReadInt();
+  buf.Skip(size);
+
+  return size + 5;
+}
+
+// {is_null: 1byte}|{value: nbyte}
+int DingoSchema<std::string>::EncodeKey(const std::any& data, Buf& buf) {
+  if (DINGO_UNLIKELY(!AllowNull() && !data.has_value())) {
+    throw std::runtime_error("data not has value.");
+  }
+
+  if (data.has_value()) {
+    buf.Write(k_not_null);
+    const auto& ref_data = std::any_cast<const std::string&>(data);
+    return EncodeBytesComparable(ref_data, buf) + 1;
   } else {
-    if (data.has_value()) {
-      int size = InternalEncodeKey(buf, data.value());
-      buf->EnsureRemainder(4);
-      buf->ReverseWriteInt(size);
-    } else {
-      // WRONG EMPTY DATA
-    }
+    buf.Write(k_null);
+    return 1;
   }
 }
 
-void DingoSchema<std::optional<std::shared_ptr<std::string>>>::EncodeKeyPrefix(
-    Buf* buf, std::optional<std::shared_ptr<std::string>> data) {
-  if (this->allow_null_) {
-    if (data.has_value()) {
-      buf->EnsureRemainder(1);
-      buf->Write(k_not_null);
-      InternalEncodeKey(buf, data.value());
-    } else {
-      buf->EnsureRemainder(1);
-      buf->Write(k_null);
-    }
+int DingoSchema<std::string>::EncodeValue(const std::any& data, Buf& buf) {
+  if (DINGO_UNLIKELY(!AllowNull() && !data.has_value())) {
+    throw std::runtime_error("data not has value.");
+  }
+
+  if (data.has_value()) {
+    buf.Write(k_not_null);
+    const auto& ref_data = std::any_cast<const std::string&>(data);
+    return EncodeBytesNotComparable(ref_data, buf) + 1;
   } else {
-    if (data.has_value()) {
-      InternalEncodeKey(buf, data.value());
-    } else {
-      // WRONG EMPTY DATA
-    }
+    buf.Write(k_null);
+    return 1;
   }
 }
 
-std::optional<std::shared_ptr<std::string>> DingoSchema<std::optional<std::shared_ptr<std::string>>>::DecodeKey(
-    Buf* buf) {
-  if (this->allow_null_) {
-    if (buf->Read() == this->k_null) {
-      buf->ReverseSkipInt();
-      return std::nullopt;
-    }
-  }
-  int length = buf->ReverseReadInt();
-  int group_num = length / 9;
-  buf->Skip(length - 1);
-  int remainder_zero = 255 - (buf->Read() & 0xFF);
-  buf->Skip(0 - length);
-  int ori_length = group_num * 8 - remainder_zero;
-  auto data = std::make_shared<std::string>(ori_length, 0);
-
-  if (ori_length != 0) {
-    int curr = 0;
-    group_num--;
-    for (int i = 0; i < group_num; i++) {
-      for (int j = 0; j < 8; j++) {
-        (*data)[curr++] = buf->Read();
-      }
-      buf->Skip(1);
-    }
-    if (remainder_zero != 8) {
-      int non_zero_count = 8 - remainder_zero;
-      for (int j = 0; j < non_zero_count; j++) {
-        (*data)[curr++] = buf->Read();
-      }
-    }
+std::any DingoSchema<std::string>::DecodeKey(Buf& buf) {
+  if (buf.Read() == k_null) {
+    return std::any();
   }
 
-  buf->Skip(remainder_zero + 1);
+  std::string data;
+  int size = DecodeBytesComparable(buf, data);
+  if (size == -1) {
+    throw std::runtime_error("decode comparable string error.");
+  }
 
-  return std::optional<std::shared_ptr<std::string>>(data);
+  return std::move(std::any(std::move(data)));
 }
 
-void DingoSchema<std::optional<std::shared_ptr<std::string>>>::SkipKey(Buf* buf) const {
-  if (this->allow_null_) {
-    buf->Skip(buf->ReverseReadInt() + 1);
-  } else {
-    buf->Skip(buf->ReverseReadInt());
-  }
-}
-
-void DingoSchema<std::optional<std::shared_ptr<std::string>>>::EncodeValue(
-    Buf* buf, std::optional<std::shared_ptr<std::string>> data) {
-  if (this->allow_null_) {
-    buf->EnsureRemainder(1);
-    if (data.has_value()) {
-      buf->Write(k_not_null);
-      InternalEncodeValue(buf, data.value());
-    } else {
-      buf->Write(k_null);
-    }
-  } else {
-    if (data.has_value()) {
-      InternalEncodeValue(buf, data.value());
-    } else {
-      // WRONG EMPTY DATA
-    }
-  }
-}
-
-std::optional<std::shared_ptr<std::string>> DingoSchema<std::optional<std::shared_ptr<std::string>>>::DecodeValue(
-    Buf* buf) {
-  if (this->allow_null_) {
-    if (buf->Read() == this->k_null) {
-      return std::nullopt;
-    }
-  }
-  int length = buf->ReadInt();
-  auto su8 = std::make_shared<std::string>(length, 0);
-
-  for (int i = 0; i < length; i++) {
-    (*su8)[i] = buf->Read();
+std::any DingoSchema<std::string>::DecodeValue(Buf& buf) {
+  if (buf.Read() == k_null) {
+    return std::any();
   }
 
-  return std::optional<std::shared_ptr<std::string>>{su8};
-}
+  std::string data;
+  DecodeBytesNotComparable(buf, data);
 
-void DingoSchema<std::optional<std::shared_ptr<std::string>>>::SkipValue(Buf* buf) const {
-  if (this->allow_null_) {
-    if (buf->Read() == this->k_null) {
-      return;
-    }
-  }
-  buf->Skip(buf->ReadInt());
+  return std::move(std::any(std::move(data)));
 }
 
 }  // namespace dingodb

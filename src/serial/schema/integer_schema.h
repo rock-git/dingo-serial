@@ -18,43 +18,33 @@
 #include <iostream>
 #include <optional>
 
-#include "serial/schema/dingo_schema.h"
+#include "dingo_schema.h"
 
 namespace dingodb {
 
 template <>
-
-class DingoSchema<std::optional<int32_t>> : public BaseSchema {
- private:
-  int index_;
-  bool key_, allow_null_;
-  bool le_ = true;
-
-  static int GetDataLength();
-  static int GetWithNullTagLength();
-  static void InternalEncodeNull(Buf* buf);
-  static void LeInternalEncodeKey(Buf* buf, int32_t data);
-  static void BeInternalEncodeKey(Buf* buf, int32_t data);
-  static void LeInternalEncodeValue(Buf* buf, int32_t data);
-  static void BeInternalEncodeValue(Buf* buf, int32_t data);
-
+class DingoSchema<int32_t> : public BaseSchema {
  public:
-  Type GetType() override;
-  bool AllowNull() override;
+  Type GetType() override { return kInteger; }
   int GetLength() override;
-  bool IsKey() override;
-  int GetIndex() override;
-  void SetIndex(int index);
-  void SetIsKey(bool key);
-  void SetAllowNull(bool allow_null);
-  void SetIsLe(bool le);
-  void EncodeKey(Buf* buf, std::optional<int32_t> data);
-  void EncodeKeyPrefix(Buf* buf, std::optional<int32_t> data);
-  std::optional<int32_t> DecodeKey(Buf* buf);
-  void SkipKey(Buf* buf);
-  void EncodeValue(Buf* buf, std::optional<int32_t> data);
-  std::optional<int32_t> DecodeValue(Buf* buf);
-  void SkipValue(Buf* buf);
+
+  BaseSchemaPtr Clone() override { return std::make_shared<DingoSchema<int32_t>>(); }
+
+  int SkipKey(Buf& buf) override;
+  int SkipValue(Buf& buf) override;
+
+  int EncodeKey(const std::any& data, Buf& buf) override;
+  int EncodeValue(const std::any& data, Buf& buf) override;
+
+  std::any DecodeKey(Buf& buf) override;
+  std::any DecodeValue(Buf& buf) override;
+
+ private:
+  void EncodeIntComparable(int32_t data, Buf& buf);
+  int32_t DecodeIntComparable(Buf& buf);
+
+  void EncodeIntNotComparable(int32_t data, Buf& buf);
+  int32_t DecodeIntNotComparable(Buf& buf);
 };
 
 }  // namespace dingodb

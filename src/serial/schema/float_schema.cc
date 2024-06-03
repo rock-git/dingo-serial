@@ -12,217 +12,173 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "serial/schema/float_schema.h"
+#include "float_schema.h"
+
+#include <cstdint>
+
+#include "serial/compiler.h"
 
 namespace dingodb {
 
-int DingoSchema<std::optional<float>>::GetDataLength() { return 4; }
+constexpr int kDataLength = 5;
 
-int DingoSchema<std::optional<float>>::GetWithNullTagLength() { return 5; }
-
-void DingoSchema<std::optional<float>>::InternalEncodeNull(Buf* buf) {
-  buf->Write(0);
-  buf->Write(0);
-  buf->Write(0);
-  buf->Write(0);
-}
-
-void DingoSchema<std::optional<float>>::LeInternalEncodeKey(Buf* buf, float data) {
+void DingoSchema<float>::EncodeFloatComparable(float data, Buf& buf) {
   uint32_t bits;
   memcpy(&bits, &data, 4);
-  if (data >= 0) {
-    buf->Write(bits >> 24 ^ 0x80);
-    buf->Write(bits >> 16);
-    buf->Write(bits >> 8);
-    buf->Write(bits);
+  if (DINGO_LIKELY(IsLe() && data >= 0)) {
+    buf.Write(bits >> 24 ^ 0x80);
+    buf.Write(bits >> 16);
+    buf.Write(bits >> 8);
+    buf.Write(bits);
+  } else if (IsLe() && data < 0) {
+    buf.Write(~bits >> 24);
+    buf.Write(~bits >> 16);
+    buf.Write(~bits >> 8);
+    buf.Write(~bits);
+  } else if (!IsLe() && data >= 0) {
+    buf.Write(bits ^ 0x80);
+    buf.Write(bits >> 8);
+    buf.Write(bits >> 16);
+    buf.Write(bits >> 24);
   } else {
-    buf->Write(~bits >> 24);
-    buf->Write(~bits >> 16);
-    buf->Write(~bits >> 8);
-    buf->Write(~bits);
+    buf.Write(~bits);
+    buf.Write(~bits >> 8);
+    buf.Write(~bits >> 16);
+    buf.Write(~bits >> 24);
   }
 }
 
-void DingoSchema<std::optional<float>>::BeInternalEncodeKey(Buf* buf, float data) {
-  uint32_t bits;
-  memcpy(&bits, &data, 4);
-  if (data >= 0) {
-    buf->Write(bits ^ 0x80);
-    buf->Write(bits >> 8);
-    buf->Write(bits >> 16);
-    buf->Write(bits >> 24);
-  } else {
-    buf->Write(~bits);
-    buf->Write(~bits >> 8);
-    buf->Write(~bits >> 16);
-    buf->Write(~bits >> 24);
-  }
-}
-
-void DingoSchema<std::optional<float>>::LeInternalEncodeValue(Buf* buf, float data) {
-  uint32_t bits;
-  memcpy(&bits, &data, 4);
-  buf->Write(bits >> 24);
-  buf->Write(bits >> 16);
-  buf->Write(bits >> 8);
-  buf->Write(bits);
-}
-
-void DingoSchema<std::optional<float>>::BeInternalEncodeValue(Buf* buf, float data) {
-  uint32_t bits;
-  memcpy(&bits, &data, 4);
-  buf->Write(bits);
-  buf->Write(bits >> 8);
-  buf->Write(bits >> 16);
-  buf->Write(bits >> 24);
-}
-
-BaseSchema::Type DingoSchema<std::optional<float>>::GetType() { return kFloat; }
-
-void DingoSchema<std::optional<float>>::SetIndex(int index) { this->index_ = index; }
-
-int DingoSchema<std::optional<float>>::GetIndex() { return this->index_; }
-
-void DingoSchema<std::optional<float>>::SetIsKey(bool key) { this->key_ = key; }
-
-bool DingoSchema<std::optional<float>>::IsKey() { return this->key_; }
-
-int DingoSchema<std::optional<float>>::GetLength() {
-  if (this->allow_null_) {
-    return GetWithNullTagLength();
-  }
-  return GetDataLength();
-}
-
-void DingoSchema<std::optional<float>>::SetAllowNull(bool allow_null) { this->allow_null_ = allow_null; }
-
-bool DingoSchema<std::optional<float>>::AllowNull() { return allow_null_; }
-
-void DingoSchema<std::optional<float>>::SetIsLe(bool le) { this->le_ = le; }
-
-void DingoSchema<std::optional<float>>::EncodeKey(Buf* buf, std::optional<float> data) {
-  if (this->allow_null_) {
-    buf->EnsureRemainder(GetWithNullTagLength());
-    if (data.has_value()) {
-      buf->Write(k_not_null);
-      if (this->le_) {
-        LeInternalEncodeKey(buf, data.value());
-      } else {
-        BeInternalEncodeKey(buf, data.value());
-      }
-    } else {
-      buf->Write(k_null);
-      InternalEncodeNull(buf);
-    }
-  } else {
-    if (data.has_value()) {
-      buf->EnsureRemainder(GetDataLength());
-      if (this->le_) {
-        LeInternalEncodeKey(buf, data.value());
-      } else {
-        BeInternalEncodeKey(buf, data.value());
-      }
-    } else {
-      // WRONG EMPTY DATA
-    }
-  }
-}
-
-void DingoSchema<std::optional<float>>::EncodeKeyPrefix(Buf* buf, std::optional<float> data) { EncodeKey(buf, data); }
-std::optional<float> DingoSchema<std::optional<float>>::DecodeKey(Buf* buf) {
-  if (this->allow_null_) {
-    if (buf->Read() == this->k_null) {
-      buf->Skip(GetDataLength());
-      return std::nullopt;
-    }
-  }
-  uint32_t in = buf->Read() & 0xFF;
-  if (this->le_) {
+float DingoSchema<float>::DecodeFloatComparable(Buf& buf) {
+  uint32_t in = buf.Read() & 0xFF;
+  if (DINGO_LIKELY(IsLe())) {
     if (in >= 0x80) {
       in = in ^ 0x80;
       for (int i = 0; i < 3; i++) {
         in <<= 8;
-        in |= buf->Read() & 0xFF;
+        in |= buf.Read() & 0xFF;
       }
     } else {
       in = ~in;
       for (int i = 0; i < 3; i++) {
         in <<= 8;
-        in |= ~buf->Read() & 0xFF;
+        in |= ~buf.Read() & 0xFF;
       }
     }
   } else {
     if (in >= 0x80) {
       in = in ^ 0x80;
       for (int i = 1; i < 4; i++) {
-        in |= (((uint32_t)buf->Read() & 0xFF) << (8 * i));
+        in |= (((uint32_t)buf.Read() & 0xFF) << (8 * i));
       }
     } else {
       for (int i = 1; i < 4; i++) {
-        in |= (((uint32_t)buf->Read() & 0xFF) << (8 * i));
+        in |= (((uint32_t)buf.Read() & 0xFF) << (8 * i));
       }
       in = ~in;
     }
   }
-  float d;
-  memcpy(&d, &in, 4);
-  return d;
+
+  void* v = &in;
+  return *reinterpret_cast<float*>(v);
 }
 
-void DingoSchema<std::optional<float>>::SkipKey(Buf* buf) { buf->Skip(GetLength()); }
-
-void DingoSchema<std::optional<float>>::EncodeValue(Buf* buf, std::optional<float> data) {
-  if (this->allow_null_) {
-    buf->EnsureRemainder(GetWithNullTagLength());
-    if (data.has_value()) {
-      buf->Write(k_not_null);
-      if (this->le_) {
-        LeInternalEncodeValue(buf, data.value());
-      } else {
-        BeInternalEncodeValue(buf, data.value());
-      }
-    } else {
-      buf->Write(k_null);
-      InternalEncodeNull(buf);
-    }
+void DingoSchema<float>::EncodeFloatNotComparable(float data, Buf& buf) {
+  uint32_t bits;
+  memcpy(&bits, &data, 4);
+  if (IsLe()) {
+    buf.Write(bits >> 24);
+    buf.Write(bits >> 16);
+    buf.Write(bits >> 8);
+    buf.Write(bits);
   } else {
-    if (data.has_value()) {
-      buf->EnsureRemainder(GetDataLength());
-      if (this->le_) {
-        LeInternalEncodeValue(buf, data.value());
-      } else {
-        BeInternalEncodeValue(buf, data.value());
-      }
-    } else {
-      // WRONG EMPTY DATA
-    }
+    buf.Write(bits);
+    buf.Write(bits >> 8);
+    buf.Write(bits >> 16);
+    buf.Write(bits >> 24);
   }
 }
+float DingoSchema<float>::DecodeFloatNotComparable(Buf& buf) {
+  uint32_t in = buf.Read() & 0xFF;
 
-std::optional<float> DingoSchema<std::optional<float>>::DecodeValue(Buf* buf) {
-  if (this->allow_null_) {
-    if (buf->Read() == this->k_null) {
-      buf->Skip(GetDataLength());
-      return std::nullopt;
-    }
-  }
-  uint32_t in = buf->Read() & 0xFF;
-  ;
-  if (this->le_) {
+  if (DINGO_LIKELY(IsLe())) {
     for (int i = 0; i < 3; i++) {
       in <<= 8;
-      in |= buf->Read() & 0xFF;
+      in |= buf.Read() & 0xFF;
     }
   } else {
     for (int i = 1; i < 4; i++) {
-      in |= (((uint32_t)buf->Read() & 0xFF) << (8 * i));
+      in |= (((uint32_t)buf.Read() & 0xFF) << (8 * i));
     }
   }
-  float d;
-  memcpy(&d, &in, 4);
-  return d;
+
+  void* v = &in;
+  return *reinterpret_cast<float*>(v);
 }
 
-void DingoSchema<std::optional<float>>::SkipValue(Buf* buf) { buf->Skip(GetLength()); }
+int DingoSchema<float>::GetLength() { return kDataLength; }
+
+int DingoSchema<float>::SkipKey(Buf& buf) {
+  buf.Skip(kDataLength);
+  return kDataLength;
+}
+
+int DingoSchema<float>::SkipValue(Buf& buf) {
+  buf.Skip(kDataLength);
+  return kDataLength;
+}
+
+// {is_null: 1byte}|{value: 4byte}
+int DingoSchema<float>::EncodeKey(const std::any& data, Buf& buf) {
+  if (DINGO_UNLIKELY(!AllowNull() && !data.has_value())) {
+    throw std::runtime_error("Not allow null, but data not has value.");
+  }
+
+  if (data.has_value()) {
+    buf.Write(k_not_null);
+    const auto& ref_data = std::any_cast<const float&>(data);
+    EncodeFloatComparable(ref_data, buf);
+  } else {
+    buf.Write(k_null);
+    buf.WriteInt(0);
+  }
+
+  return kDataLength;
+}
+
+// {is_null: 1byte}|{value: 4byte}
+int DingoSchema<float>::EncodeValue(const std::any& data, Buf& buf) {
+  if (DINGO_UNLIKELY(!AllowNull() && !data.has_value())) {
+    throw std::runtime_error("Not allow null, but data not has value.");
+  }
+
+  if (data.has_value()) {
+    buf.Write(k_not_null);
+    const auto& ref_data = std::any_cast<const float&>(data);
+    EncodeFloatNotComparable(ref_data, buf);
+  } else {
+    buf.Write(k_null);
+    buf.WriteInt(0);
+  }
+
+  return kDataLength;
+}
+
+std::any DingoSchema<float>::DecodeKey(Buf& buf) {
+  if (buf.Read() == k_null) {
+    buf.Skip(kDataLength - 1);
+    return std::any();
+  }
+
+  return std::move(std::any(DecodeFloatComparable(buf)));
+}
+
+std::any DingoSchema<float>::DecodeValue(Buf& buf) {
+  if (buf.Read() == k_null) {
+    buf.Skip(kDataLength - 1);
+    return std::any();
+  }
+
+  return std::move(std::any(DecodeFloatNotComparable(buf)));
+}
 
 }  // namespace dingodb

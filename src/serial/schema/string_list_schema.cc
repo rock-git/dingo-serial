@@ -12,132 +12,104 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "serial/schema/string_list_schema.h"
+#include "string_list_schema.h"
 
+#include <any>
 #include <memory>
 #include <string>
+#include <utility>
+
+#include "serial/compiler.h"
 
 namespace dingodb {
 
-int DingoSchema<std::optional<std::shared_ptr<std::vector<std::string>>>>::GetDataLength() { return 0; }
-
-int DingoSchema<std::optional<std::shared_ptr<std::vector<std::string>>>>::GetWithNullTagLength() { return 0; }
-
-void DingoSchema<std::optional<std::shared_ptr<std::vector<std::string>>>>::InternalEmlementEncodeValue(
-    Buf* buf, const std::string& data) {
-  buf->EnsureRemainder(data.length() + 4);
-  buf->WriteInt(data.length());
-  buf->Write(data);
-}
-
-void DingoSchema<std::optional<std::shared_ptr<std::vector<std::string>>>>::InternalEncodeValue(
-    Buf* buf, std::shared_ptr<std::vector<std::string>> data) {
-  // vector size
-  buf->EnsureRemainder(4);
-  buf->WriteInt(data->size());
-  for (const std::string& str : *data) {
-    InternalEmlementEncodeValue(buf, str);
+int DingoSchema<std::vector<std::string>>::EncodeStringListNotComparable(const std::vector<std::string>& data,
+                                                                         Buf& buf) {
+  int size = 4;
+  buf.WriteInt(data.size());
+  for (const std::string& str : data) {
+    buf.WriteInt(str.length());
+    buf.WriteString(str);
+    size += str.size() + 4;
   }
+
+  return size;
 }
 
-BaseSchema::Type DingoSchema<std::optional<std::shared_ptr<std::vector<std::string>>>>::GetType() {
-  return kStringList;
-}
-
-void DingoSchema<std::optional<std::shared_ptr<std::vector<std::string>>>>::SetIndex(int index) {
-  this->index_ = index;
-}
-
-int DingoSchema<std::optional<std::shared_ptr<std::vector<std::string>>>>::GetIndex() { return this->index_; }
-
-void DingoSchema<std::optional<std::shared_ptr<std::vector<std::string>>>>::SetIsKey(bool key) { this->key_ = key; }
-
-bool DingoSchema<std::optional<std::shared_ptr<std::vector<std::string>>>>::IsKey() { return this->key_; }
-
-int DingoSchema<std::optional<std::shared_ptr<std::vector<std::string>>>>::GetLength() {
-  if (this->allow_null_) {
-    return GetWithNullTagLength();
-  }
-  return GetDataLength();
-}
-
-void DingoSchema<std::optional<std::shared_ptr<std::vector<std::string>>>>::SetAllowNull(bool allow_null) {
-  this->allow_null_ = allow_null;
-}
-
-bool DingoSchema<std::optional<std::shared_ptr<std::vector<std::string>>>>::AllowNull() { return this->allow_null_; }
-
-void DingoSchema<std::optional<std::shared_ptr<std::vector<std::string>>>>::EncodeKey(
-    Buf* /*buf*/, std::optional<std::shared_ptr<std::vector<std::string>>> /*data*/) {
-  throw std::runtime_error("Unsupported EncodeKey List Type");
-}
-
-void DingoSchema<std::optional<std::shared_ptr<std::vector<std::string>>>>::EncodeKeyPrefix(
-    Buf* /*buf*/, std::optional<std::shared_ptr<std::vector<std::string>>> /*data*/) {
-  throw std::runtime_error("Unsupported EncodeKey List Type");
-}
-
-std::optional<std::shared_ptr<std::vector<std::string>>>
-DingoSchema<std::optional<std::shared_ptr<std::vector<std::string>>>>::DecodeKey(Buf* /*buf*/) {
-  throw std::runtime_error("Unsupported EncodeKey List Type");
-}
-
-void DingoSchema<std::optional<std::shared_ptr<std::vector<std::string>>>>::SkipKey(Buf* /*buf*/) {
-  throw std::runtime_error("Unsupported EncodeKey List Type");
-}
-
-void DingoSchema<std::optional<std::shared_ptr<std::vector<std::string>>>>::EncodeValue(
-    Buf* buf, std::optional<std::shared_ptr<std::vector<std::string>>> data) {
-  if (this->allow_null_) {
-    buf->EnsureRemainder(1);
-    if (data.has_value()) {
-      buf->Write(k_not_null);
-      InternalEncodeValue(buf, data.value());
-    } else {
-      buf->Write(k_null);
+void DingoSchema<std::vector<std::string>>::DecodeStringListNotComparable(Buf& buf, std::vector<std::string>& data) {
+  int size = buf.ReadInt();
+  data.resize(size);
+  for (int i = 0; i < size; ++i) {
+    int str_len = buf.ReadInt();
+    std::string str(str_len, '\n');
+    for (int j = 0; j < str_len; ++j) {
+      str[j] = buf.Read();
     }
+    data[i] = std::move(str);
+  }
+}
+
+int DingoSchema<std::vector<std::string>>::GetLength() {
+  throw std::runtime_error("string list unsupport length");
+  return -1;
+}
+
+int DingoSchema<std::vector<std::string>>::SkipKey(Buf&) {
+  throw std::runtime_error("Unsupported encode key list type");
+  return -1;
+}
+
+int DingoSchema<std::vector<std::string>>::SkipValue(Buf& buf) {
+  if (buf.Read() == k_null) {
+    return 1;
+  }
+
+  int size = 5;
+  int str_num = buf.ReadInt();
+  for (int i = 0; i < str_num; ++i) {
+    int str_len = buf.ReadInt();
+    buf.Skip(str_len);
+    size += str_len + 4;
+  }
+
+  return size;
+}
+
+int DingoSchema<std::vector<std::string>>::EncodeKey(const std::any&, Buf&) {
+  throw std::runtime_error("Unsupported encode key list type");
+  return -1;
+}
+
+//
+int DingoSchema<std::vector<std::string>>::EncodeValue(const std::any& data, Buf& buf) {
+  if (DINGO_UNLIKELY(!AllowNull() && !data.has_value())) {
+    throw std::runtime_error("Not allow null, but data not has value.");
+  }
+
+  if (data.has_value()) {
+    buf.Write(k_not_null);
+    const auto& ref_data = std::any_cast<const std::vector<std::string>&>(data);
+    return EncodeStringListNotComparable(ref_data, buf) + 1;
   } else {
-    if (data.has_value()) {
-      InternalEncodeValue(buf, data.value());
-    } else {
-      // WRONG EMPTY DATA
-    }
+    buf.Write(k_null);
+
+    return 1;
   }
 }
 
-std::optional<std::shared_ptr<std::vector<std::string>>>
-DingoSchema<std::optional<std::shared_ptr<std::vector<std::string>>>>::DecodeValue(Buf* buf) {
-  if (this->allow_null_) {
-    if (buf->Read() == this->k_null) {
-      return std::nullopt;
-    }
-  }
-  int length = buf->ReadInt();
-  std::shared_ptr<std::vector<std::string>> data = std::make_shared<std::vector<std::string>>();
-  data->reserve(length);
-  for (int i = 0; i < length; i++) {
-    int str_len = buf->ReadInt();
-    std::string str;
-    for (int j = 0; j < str_len; j++) {
-      str.push_back(buf->Read());
-    }
-    data->push_back(std::move(str));
-  }
-
-  return data;
+std::any DingoSchema<std::vector<std::string>>::DecodeKey(Buf&) {
+  throw std::runtime_error("Unsupported encode key list type");
 }
 
-void DingoSchema<std::optional<std::shared_ptr<std::vector<std::string>>>>::SkipValue(Buf* buf) const {
-  if (this->allow_null_) {
-    if (buf->Read() == this->k_null) {
-      return;
-    }
+std::any DingoSchema<std::vector<std::string>>::DecodeValue(Buf& buf) {
+  if (buf.Read() == k_null) {
+    return std::any();
   }
-  int length = buf->ReadInt();
-  for (int i = 0; i < length; i++) {
-    int str_len = buf->ReadInt();
-    buf->Skip(str_len);
-  }
+
+  std::vector<std::string> data;
+  DecodeStringListNotComparable(buf, data);
+
+  return std::any(std::move(data));
 }
 
 }  // namespace dingodb

@@ -14,186 +14,173 @@
 
 #include <byteswap.h>
 #include <gtest/gtest.h>
-#include <serial/record_decoder.h>
-#include <serial/record_encoder.h>
-#include <serial/utils.h>
 
 #include <memory>
 #include <optional>
 #include <string>
 
 #include "serial/counter.h"
+#include "serial/record_decoder.h"
+#include "serial/record_encoder.h"
 #include "serial/schema/base_schema.h"
+#include "serial/utils.h"
 
 using namespace dingodb;
-using namespace std;
 
 class DingoSerialTest : public testing::Test {
- private:
-  std::shared_ptr<vector<std::shared_ptr<BaseSchema>>> schemas_;
-  vector<any>* record_;
-
  public:
   void InitVector() {
-    schemas_ = std::make_shared<vector<std::shared_ptr<BaseSchema>>>(11);
+    schemas_.resize(11);
 
-    auto id = std::make_shared<DingoSchema<optional<int32_t>>>();
+    auto id = std::make_shared<DingoSchema<int32_t>>();
     id->SetIndex(0);
     id->SetAllowNull(false);
     id->SetIsKey(true);
-    schemas_->at(0) = id;
+    schemas_.at(0) = id;
 
-    auto name = std::make_shared<DingoSchema<optional<shared_ptr<string>>>>();
+    auto name = std::make_shared<DingoSchema<std::string>>();
     name->SetIndex(1);
     name->SetAllowNull(false);
     name->SetIsKey(true);
-    schemas_->at(1) = name;
+    schemas_.at(1) = name;
 
-    auto gender = std::make_shared<DingoSchema<optional<shared_ptr<string>>>>();
+    auto gender = std::make_shared<DingoSchema<std::string>>();
     gender->SetIndex(2);
     gender->SetAllowNull(false);
     gender->SetIsKey(true);
-    schemas_->at(2) = gender;
+    schemas_.at(2) = gender;
 
-    auto score = std::make_shared<DingoSchema<optional<int64_t>>>();
+    auto score = std::make_shared<DingoSchema<int64_t>>();
     score->SetIndex(3);
     score->SetAllowNull(false);
     score->SetIsKey(true);
-    schemas_->at(3) = score;
+    schemas_.at(3) = score;
 
-    auto addr = std::make_shared<DingoSchema<optional<shared_ptr<string>>>>();
+    auto addr = std::make_shared<DingoSchema<std::string>>();
     addr->SetIndex(4);
     addr->SetAllowNull(true);
     addr->SetIsKey(false);
-    schemas_->at(4) = addr;
+    schemas_.at(4) = addr;
 
-    auto exist = std::make_shared<DingoSchema<optional<bool>>>();
+    auto exist = std::make_shared<DingoSchema<bool>>();
     exist->SetIndex(5);
     exist->SetAllowNull(false);
     exist->SetIsKey(false);
-    schemas_->at(5) = exist;
+    schemas_.at(5) = exist;
 
-    auto pic = std::make_shared<DingoSchema<optional<shared_ptr<string>>>>();
+    auto pic = std::make_shared<DingoSchema<std::string>>();
     pic->SetIndex(6);
     pic->SetAllowNull(true);
     pic->SetIsKey(false);
-    schemas_->at(6) = pic;
+    schemas_.at(6) = pic;
 
-    auto test_null = std::make_shared<DingoSchema<optional<int32_t>>>();
+    auto test_null = std::make_shared<DingoSchema<int32_t>>();
     test_null->SetIndex(7);
     test_null->SetAllowNull(true);
     test_null->SetIsKey(false);
-    schemas_->at(7) = test_null;
+    schemas_.at(7) = test_null;
 
-    auto age = std::make_shared<DingoSchema<optional<int32_t>>>();
+    auto age = std::make_shared<DingoSchema<int32_t>>();
     age->SetIndex(8);
     age->SetAllowNull(false);
     age->SetIsKey(false);
-    schemas_->at(8) = age;
+    schemas_.at(8) = age;
 
-    auto prev = std::make_shared<DingoSchema<optional<int64_t>>>();
+    auto prev = std::make_shared<DingoSchema<int64_t>>();
     prev->SetIndex(9);
     prev->SetAllowNull(false);
     prev->SetIsKey(false);
-    schemas_->at(9) = prev;
+    schemas_.at(9) = prev;
 
-    auto salary = std::make_shared<DingoSchema<optional<double>>>();
+    auto salary = std::make_shared<DingoSchema<double>>();
     salary->SetIndex(10);
     salary->SetAllowNull(true);
     salary->SetIsKey(false);
-    schemas_->at(10) = salary;
+    schemas_.at(10) = salary;
   }
 
   void DeleteSchemas() {
-    schemas_->clear();
-    schemas_->shrink_to_fit();
+    schemas_.clear();
+    schemas_.shrink_to_fit();
   }
 
   void InitRecord() {
-    record_ = new vector<any>(11);
-    optional<int32_t> id = 0;
-    std::shared_ptr<std::string> name = std::make_shared<std::string>("tn");
-    std::shared_ptr<std::string> gender = std::make_shared<std::string>("f");
-    optional<int64_t> score = 214748364700L;
-    std::shared_ptr<std::string> addr = std::make_shared<std::string>(
+    record_.resize(11);
+
+    int32_t id = 0;
+    std::string name = "tn";
+    std::string gender = "f";
+    int64_t score = 214748364700L;
+    std::string addr =
         "test address test 中文 表情😊🏷️👌 test "
         "测试测试测试三🤣😂😁🐱‍🐉👏🐱‍💻✔🤳🤦‍♂️🤦‍♀️🙌测试测试"
         "测"
-        "试伍佰肆拾陆万伍仟陆佰伍拾肆元/n/r/r/ndfs肥肉士大夫");
-    optional<bool> exist = false;
-    optional<shared_ptr<string>> pic = nullopt;
-    optional<int32_t> test_null = nullopt;
-    optional<int32_t> age = -20;
-    optional<int64_t> prev = -214748364700L;
-    optional<double> salary = 873485.4234;
+        "试伍佰肆拾陆万伍仟陆佰伍拾肆元/n/r/r/ndfs肥肉士大夫";
+    bool exist = false;
 
-    record_->at(0) = id;
-    record_->at(1) = optional<shared_ptr<string>>{name};
-    record_->at(2) = optional<shared_ptr<string>>{gender};
-    record_->at(3) = score;
-    record_->at(4) = optional<shared_ptr<string>>{addr};
-    record_->at(5) = exist;
-    record_->at(6) = pic;
-    record_->at(7) = test_null;
-    record_->at(8) = age;
-    record_->at(9) = prev;
-    record_->at(10) = salary;
+    int32_t age = -20;
+    int64_t prev = -214748364700L;
+    double salary = 873485.4234;
+
+    record_.at(0) = id;
+    record_.at(1) = name;
+    record_.at(2) = gender;
+    record_.at(3) = score;
+    record_.at(4) = addr;
+    record_.at(5) = exist;
+    record_.at(8) = age;
+    record_.at(9) = prev;
+    record_.at(10) = salary;
   }
-  void DeleteRecords() const {
-    optional<shared_ptr<string>> name = any_cast<optional<shared_ptr<string>>>(record_->at(1));
-    if (name.has_value()) {
-    }
-    optional<shared_ptr<string>> gender = any_cast<optional<shared_ptr<string>>>(record_->at(2));
-    if (gender.has_value()) {
-    }
-    optional<shared_ptr<string>> addr = any_cast<optional<shared_ptr<string>>>(record_->at(4));
-    if (addr.has_value()) {
-    }
-    record_->clear();
-    record_->shrink_to_fit();
+
+  void DeleteRecords() {
+    record_.clear();
+    record_.shrink_to_fit();
   }
-  std::shared_ptr<vector<std::shared_ptr<BaseSchema>>> GetSchemas() const { return schemas_; }
-  vector<any>* GetRecord() const { return record_; }
+
+  const std::vector<BaseSchemaPtr>& GetSchemas() const { return schemas_; }
+  const std::vector<std::any>& GetRecord() const { return record_; }
 
  protected:
   bool le = IsLE();
   void SetUp() override {}
   void TearDown() override {}
+
+ private:
+  std::vector<BaseSchemaPtr> schemas_;
+  std::vector<std::any> record_;
 };
 
 TEST_F(DingoSerialTest, keyvaluecodeStringLoopTest) {
   int32_t n = 10000;
   // Define column definitions and records
-  vector<any> record1(n);
-  std::shared_ptr<vector<std::shared_ptr<BaseSchema>>> schemas =
-      std::make_shared<vector<std::shared_ptr<BaseSchema>>>(n);
+  std::vector<std::any> record1(n);
+  std::vector<BaseSchemaPtr> schemas(n);
   for (int i = 0; i < n; i++) {
-    std::shared_ptr<std::string> column_value = std::make_shared<std::string>("value_" + std::to_string(i));
-    auto str = std::make_shared<DingoSchema<optional<shared_ptr<string>>>>();
+    std::string column_value = "value_" + std::to_string(i);
+    auto str = std::make_shared<DingoSchema<std::string>>();
     str->SetIndex(i);
     str->SetAllowNull(false);
     str->SetIsKey(false);
-    schemas->at(i) = str;
-    record1.at(i) = optional<shared_ptr<string>>{column_value};
+    schemas.at(i) = str;
+    record1.at(i) = column_value;
   }
   ASSERT_EQ(n, record1.size());
+
   // encode record
-  std::shared_ptr<RecordEncoder> re = std::make_shared<RecordEncoder>(0, schemas, 0L, this->le);
+  RecordEncoder re(0, schemas, 0L, this->le);
   std::string key;
   std::string value;
   Counter load_cnter1;
   load_cnter1.ReStart();
-  (void)re->Encode('r', record1, key, value);
-  int64_t time_db_fetch1 = load_cnter1.MtimeElapsed();
-  std::cout << "Encode Time : " << time_db_fetch1 << " milliseconds" << '\n';
+  re.Encode('r', record1, key, value);
+
   // Decode record and verify values
-  std::shared_ptr<RecordDecoder> rd = std::make_shared<RecordDecoder>(0, schemas, 0L, this->le);
+  RecordDecoder rd(0, schemas, 0L, this->le);
   std::vector<std::any> decoded_records;
   Counter load_cnter2;
   load_cnter2.ReStart();
-  (void)rd->Decode(key, value, decoded_records);
-  std::cout << "Decode Time : " << load_cnter2.MtimeElapsed() << " milliseconds" << '\n';
-  std::cout << "Decode output records size:" << decoded_records.size() << '\n';
+  rd.Decode(key, value, decoded_records);
 
   // Decode record selection columns
   int selection_columns_size = n - 3;
@@ -207,12 +194,10 @@ TEST_F(DingoSerialTest, keyvaluecodeStringLoopTest) {
     std::vector<std::any> decoded_s_records;
     Counter load_cnter3;
     load_cnter3.ReStart();
-    // std::sort(column_indexes.begin(), column_indexes.end());
-    (void)rd->Decode(key, value, column_indexes, decoded_s_records);
-    std::cout << "Decode selection columns size:" << selection_columns_size
-              << ", need Time : " << load_cnter3.MtimeElapsed() << " milliseconds" << '\n';
-    std::cout << "Decode selection output records size:" << decoded_s_records.size() << '\n';
+
+    rd.Decode(key, value, column_indexes, decoded_s_records);
   }
+
   {
     std::vector<int> indexes;
     selection_columns_size = n - selection_columns_size;
@@ -224,10 +209,7 @@ TEST_F(DingoSerialTest, keyvaluecodeStringLoopTest) {
     std::vector<std::any> decoded_s_records;
     Counter load_cnter3;
     load_cnter3.ReStart();
-    // std::sort(column_indexes.begin(), column_indexes.end());
-    (void)rd->Decode(key, value, column_indexes, decoded_s_records);
-    std::cout << "Decode selection columns size:" << selection_columns_size
-              << ", need Time : " << load_cnter3.MtimeElapsed() << " milliseconds" << '\n';
-    std::cout << "Decode selection output records size:" << decoded_s_records.size() << '\n';
+
+    rd.Decode(key, value, column_indexes, decoded_s_records);
   }
 }

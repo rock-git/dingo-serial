@@ -12,115 +12,81 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "serial/schema/boolean_list_schema.h"
+#include "boolean_list_schema.h"
+
+#include <any>
+#include <cstddef>
+#include <cstdint>
+#include <utility>
+
+#include "serial/compiler.h"
 
 namespace dingodb {
 
-int DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::GetDataLength() { return 1; }
-
-int DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::GetWithNullTagLength() { return 2; }
-
-void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::InternalEncodeValue(Buf* buf, bool data) {
-  buf->Write(data);
+int DingoSchema<std::vector<bool>>::GetLength() {
+  throw std::runtime_error("bool list unsupport length");
+  return -1;
 }
 
-void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::InternalEncodeNull(Buf* buf) { buf->Write(0); }
+int DingoSchema<std::vector<bool>>::SkipKey(Buf&) {
+  throw std::runtime_error("Unsupport encode key list type");
+  return -1;
+}
 
-BaseSchema::Type DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::GetType() { return kBoolList; }
-
-void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::SetIndex(int index) { this->index_ = index; }
-
-int DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::GetIndex() { return this->index_; }
-
-void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::SetIsKey(bool key) { this->key_ = key; }
-
-bool DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::IsKey() { return this->key_; }
-
-int DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::GetLength() {
-  if (this->allow_null_) {
-    return GetWithNullTagLength();
+int DingoSchema<std::vector<bool>>::SkipValue(Buf& buf) {
+  uint8_t is_null = buf.Read();
+  if (is_null == k_null) {
+    return 1;
   }
-  return GetDataLength();
+
+  int32_t size = buf.ReadInt();
+  buf.Skip(size);
+
+  return size + 1;
 }
 
-void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::SetAllowNull(bool allow_null) {
-  this->allow_null_ = allow_null;
+int DingoSchema<std::vector<bool>>::EncodeKey(const std::any&, Buf&) {
+  throw std::runtime_error("Unsupport encode key list type");
+  return -1;
 }
 
-bool DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::AllowNull() { return this->allow_null_; }
+// {is_null: 1byte}|{n:4byte}|{value: 1byte}*n
+int DingoSchema<std::vector<bool>>::EncodeValue(const std::any& data, Buf& buf) {
+  if (DINGO_UNLIKELY(!AllowNull() && !data.has_value())) {
+    throw std::runtime_error("Not allow null, but data not has value.");
+  }
 
-void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::EncodeKey(
-    Buf* /*buf*/, std::optional<std::shared_ptr<std::vector<bool>>> /*data*/) {
-  throw std::runtime_error("Unsupported EncodeKey List Type");
-}
+  if (DINGO_LIKELY(data.has_value())) {
+    const auto& ref_data = std::any_cast<const std::vector<bool>&>(data);
 
-void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::EncodeKeyPrefix(
-    Buf* buf, std::optional<std::shared_ptr<std::vector<bool>>> data) {
-  EncodeKey(buf, data);
-}
-
-std::optional<std::shared_ptr<std::vector<bool>>>
-DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::DecodeKey(Buf* /*buf*/) {
-  throw std::runtime_error("Unsupported EncodeKey List Type");
-}
-
-void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::SkipKey(Buf* /*buf*/) {
-  throw std::runtime_error("Unsupported EncodeKey List Type");
-}
-
-void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::EncodeValue(
-    Buf* buf, std::optional<std::shared_ptr<std::vector<bool>>> data) {
-  if (this->allow_null_) {
-    if (data.has_value()) {
-      int data_size = data.value()->size();
-      buf->EnsureRemainder(5 + data_size);
-      buf->Write(k_not_null);
-      buf->WriteInt(data_size);
-      for (const bool value : *data.value()) {
-        InternalEncodeValue(buf, value);
-      }
-    } else {
-      buf->EnsureRemainder(1);
-      buf->Write(k_null);
+    buf.Write(k_not_null);
+    buf.WriteInt(ref_data.size());
+    for (const bool& value : ref_data) {
+      buf.Write(value ? 1 : 0);
     }
+
+    return ref_data.size() + 5;
   } else {
-    if (data.has_value()) {
-      int data_size = data.value()->size();
-      buf->EnsureRemainder(4 + data_size);
-      buf->WriteInt(data_size);
-      for (const bool value : *data.value()) {
-        InternalEncodeValue(buf, value);
-      }
-    } else {
-      // WRONG EMPTY DATA
-    }
+    buf.Write(k_null);
+    return 1;
   }
 }
 
-std::optional<std::shared_ptr<std::vector<bool>>>
-DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::DecodeValue(Buf* buf) {
-  if (this->allow_null_) {
-    if (buf->Read() == this->k_null) {
-      return std::nullopt;
-    }
-  }
-  int length = buf->ReadInt();
-  std::shared_ptr<std::vector<bool>> vector = std::make_shared<std::vector<bool>>(length);
-  for (int i = 0; i < length; i++) {
-    bool b = buf->Read();
-    (*vector)[i] = b;
-  }
-  return vector;
-}
+std::any DingoSchema<std::vector<bool>>::DecodeKey(Buf&) { throw std::runtime_error("Unsupport decode key list type"); }
 
-void DingoSchema<std::optional<std::shared_ptr<std::vector<bool>>>>::SkipValue(Buf* buf) {
-  if (this->allow_null_) {
-    if (buf->Read() == this->k_null) {
-      return;
-    }
+std::any DingoSchema<std::vector<bool>>::DecodeValue(Buf& buf) {
+  if (buf.Read() == k_null) {
+    return std::any();
   }
-  int length = buf->ReadInt();
-  buf->Skip(length);
+
+  int size = buf.ReadInt();
+
+  std::vector<bool> data(size, false);
+  for (int i = 0; i < size; ++i) {
+    data[i] = buf.Read();
+  }
+
+  return std::any(std::move(data));
 }
 
 }  // namespace dingodb

@@ -21,49 +21,54 @@
 #include "functional"
 #include "keyvalue.h"
 #include "optional"
-#include "serial/schema/boolean_list_schema.h"
-#include "serial/schema/boolean_schema.h"
-#include "serial/schema/double_list_schema.h"
-#include "serial/schema/double_schema.h"
-#include "serial/schema/float_list_schema.h"
-#include "serial/schema/float_schema.h"
-#include "serial/schema/integer_list_schema.h"
-#include "serial/schema/integer_schema.h"
-#include "serial/schema/long_list_schema.h"
-#include "serial/schema/long_schema.h"
-#include "serial/schema/string_list_schema.h"
-#include "serial/schema/string_schema.h"
-#include "serial/utils.h"
+#include "schema/boolean_list_schema.h"
+#include "schema/boolean_schema.h"
+#include "schema/double_list_schema.h"
+#include "schema/double_schema.h"
+#include "schema/float_list_schema.h"
+#include "schema/float_schema.h"
+#include "schema/integer_list_schema.h"
+#include "schema/integer_schema.h"
+#include "schema/long_list_schema.h"
+#include "schema/long_schema.h"
+#include "schema/string_list_schema.h"
+#include "schema/string_schema.h"
+#include "utils.h"
 
 namespace dingodb {
 
+class RecordDecoder;
+using RecordDecoderPtr = std::shared_ptr<RecordDecoder>;
+
 class RecordDecoder {
- private:
-  bool CheckPrefix(Buf& buf) const;
-  bool CheckReverseTag(Buf& buf) const;
-  bool CheckSchemaVersion(Buf& buf) const;
-
-  int codec_version_ = 1;
-  int schema_version_;
-  std::shared_ptr<std::vector<std::shared_ptr<BaseSchema>>> schemas_;
-  long common_id_;
-  bool le_;
-
  public:
-  RecordDecoder(int schema_version, std::shared_ptr<std::vector<std::shared_ptr<BaseSchema>>> schemas, long common_id);
-  RecordDecoder(int schema_version, std::shared_ptr<std::vector<std::shared_ptr<BaseSchema>>> schemas, long common_id,
-                bool le);
+  RecordDecoder(int schema_version, const std::vector<BaseSchemaPtr>& schemas, long common_id);
+  RecordDecoder(int schema_version, const std::vector<BaseSchemaPtr>& schemas, long common_id, bool le);
 
-  void Init(int schema_version, std::shared_ptr<std::vector<std::shared_ptr<BaseSchema>>> schemas, long common_id);
+  static RecordDecoderPtr New(int schema_version, const std::vector<BaseSchemaPtr>& schemas, long common_id) {
+    return std::make_shared<RecordDecoder>(schema_version, schemas, common_id);
+  }
 
   int Decode(const KeyValue& key_value, std::vector<std::any>& record /*output*/);
   int Decode(const std::string& key, const std::string& value, std::vector<std::any>& record /*output*/);
+  int Decode(std::string&& key, std::string&& value, std::vector<std::any>& record /*output*/);
   int DecodeKey(const std::string& key, std::vector<std::any>& record /*output*/);
 
   int Decode(const KeyValue& key_value, const std::vector<int>& column_indexes,
              std::vector<std::any>& record /*output*/);
   int Decode(const std::string& key, const std::string& value, const std::vector<int>& column_indexes,
              std::vector<std::any>& record /*output*/);
+
+ private:
+  bool CheckPrefix(Buf& buf) const;
+  bool CheckReverseTag(Buf& buf) const;
+  bool CheckSchemaVersion(Buf& buf) const;
+
+  bool le_;
+  int codec_version_ = 1;
+  int schema_version_;
+  long common_id_;
+  std::vector<BaseSchemaPtr> schemas_;
 };
 
 }  // namespace dingodb

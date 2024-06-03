@@ -15,41 +15,33 @@
 #ifndef DINGO_SERIAL_BOOLEAN_SCHEMA_H_
 #define DINGO_SERIAL_BOOLEAN_SCHEMA_H_
 
+#include <cstdint>
 #include <iostream>
 #include <optional>
 
-#include "serial/schema/dingo_schema.h"
+#include "dingo_schema.h"
 
 namespace dingodb {
 
 template <>
-
-class DingoSchema<std::optional<bool>> : public BaseSchema {
- private:
-  int index_;
-  bool key_, allow_null_;
-
-  static int GetDataLength();
-  static int GetWithNullTagLength();
-  static void InternalEncodeValue(Buf* buf, bool data);
-  static void InternalEncodeNull(Buf* buf);
-
+class DingoSchema<bool> : public BaseSchema {
  public:
-  Type GetType() override;
-  bool AllowNull() override;
+  Type GetType() override { return kBool; }
   int GetLength() override;
-  bool IsKey() override;
-  int GetIndex() override;
-  void SetIndex(int index);
-  void SetIsKey(bool key);
-  void SetAllowNull(bool allow_null);
-  void EncodeKey(Buf* buf, std::optional<bool> data);
-  void EncodeKeyPrefix(Buf* buf, std::optional<bool> data);
-  std::optional<bool> DecodeKey(Buf* buf);
-  void SkipKey(Buf* buf);
-  void EncodeValue(Buf* buf, std::optional<bool> data);
-  std::optional<bool> DecodeValue(Buf* buf);
-  void SkipValue(Buf* buf);
+
+  BaseSchemaPtr Clone() override { return std::make_shared<DingoSchema<bool>>(); }
+
+  int SkipKey(Buf& buf) override;
+  int SkipValue(Buf& buf) override;
+
+  int EncodeKey(const std::any& data, Buf& buf) override;
+  int EncodeValue(const std::any& data, Buf& buf) override;
+
+  std::any DecodeKey(Buf& buf) override;
+  std::any DecodeValue(Buf& buf) override;
+
+ private:
+  int Encode(const std::any& data, Buf& buf);
 };
 
 }  // namespace dingodb

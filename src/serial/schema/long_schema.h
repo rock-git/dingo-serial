@@ -18,47 +18,33 @@
 #include <iostream>
 #include <optional>
 
-#include "serial/schema/dingo_schema.h"
+#include "dingo_schema.h"
 
 namespace dingodb {
 
 template <>
-
-class DingoSchema<std::optional<int64_t>> : public BaseSchema {
+class DingoSchema<int64_t> : public BaseSchema {
  public:
-  static void InternalEncodeKey(Buf* buf, int64_t data);
-  static int64_t InternalDecodeKey(Buf* buf);
+  Type GetType() override { return kLong; }
+  int GetLength() override;
+
+  BaseSchemaPtr Clone() override { return std::make_shared<DingoSchema<int64_t>>(); }
+
+  int SkipKey(Buf& buf) override;
+  int SkipValue(Buf& buf) override;
+
+  int EncodeKey(const std::any& data, Buf& buf) override;
+  int EncodeValue(const std::any& data, Buf& buf) override;
+
+  std::any DecodeKey(Buf& buf) override;
+  std::any DecodeValue(Buf& buf) override;
 
  private:
-  int index_;
-  bool key_, allow_null_;
-  bool le_ = true;
+  void EncodeLongComparable(int64_t data, Buf& buf);
+  int64_t DecodeLongComparable(Buf& buf);
 
-  static int GetDataLength();
-  static int GetWithNullTagLength();
-  static void InternalEncodeNull(Buf* buf);
-  static void LeInternalEncodeKey(Buf* buf, int64_t data);
-  static void BeInternalEncodeKey(Buf* buf, int64_t data);
-  static void LeInternalEncodeValue(Buf* buf, int64_t data);
-  static void BeInternalEncodeValue(Buf* buf, int64_t data);
-
- public:
-  Type GetType() override;
-  bool AllowNull() override;
-  int GetLength() override;
-  bool IsKey() override;
-  int GetIndex() override;
-  void SetIndex(int index);
-  void SetIsKey(bool key);
-  void SetAllowNull(bool allow_null);
-  void SetIsLe(bool le);
-  void EncodeKey(Buf* buf, std::optional<int64_t> data);
-  void EncodeKeyPrefix(Buf* buf, std::optional<int64_t> data);
-  std::optional<int64_t> DecodeKey(Buf* buf);
-  void SkipKey(Buf* buf);
-  void EncodeValue(Buf* buf, std::optional<int64_t> data);
-  std::optional<int64_t> DecodeValue(Buf* buf);
-  void SkipValue(Buf* buf);
+  void EncodeLongNotComparable(int64_t data, Buf& buf);
+  int64_t DecodeLongNotComparable(Buf& buf);
 };
 
 }  // namespace dingodb

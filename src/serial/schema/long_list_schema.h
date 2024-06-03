@@ -20,41 +20,30 @@
 #include <optional>
 #include <vector>
 
-#include "serial/schema/dingo_schema.h"
+#include "dingo_schema.h"
 
 namespace dingodb {
 
 template <>
-
-class DingoSchema<std::optional<std::shared_ptr<std::vector<int64_t>>>> : public BaseSchema {
- private:
-  int index_;
-  bool key_, allow_null_;
-  bool le_ = true;
-
-  static int GetDataLength();
-  static int GetWithNullTagLength();
-  static void LeInternalEncodeValue(Buf* buf, int64_t data);
-  static void BeInternalEncodeValue(Buf* buf, int64_t data);
-
+class DingoSchema<std::vector<int64_t>> : public BaseSchema {
  public:
-  Type GetType() override;
-  bool AllowNull() override;
+  Type GetType() override { return kLongList; }
   int GetLength() override;
-  bool IsKey() override;
-  int GetIndex() override;
-  void SetIndex(int index);
-  void SetIsKey(bool key);
-  void SetAllowNull(bool allow_null);
-  void SetIsLe(bool le);
-  static void EncodeKey(Buf* buf, std::optional<std::shared_ptr<std::vector<int64_t>>> data);
-  static void EncodeKeyPrefix(Buf* buf, std::optional<std::shared_ptr<std::vector<int64_t>>> data);
-  static std::optional<std::shared_ptr<std::vector<int64_t>>> DecodeKey(Buf* buf);
-  static void SkipKey(Buf* buf);
-  uint64_t InternalDecodeData(Buf* buf) const;
-  void EncodeValue(Buf* buf, std::optional<std::shared_ptr<std::vector<int64_t>>> data);
-  std::optional<std::shared_ptr<std::vector<int64_t>>> DecodeValue(Buf* buf);
-  void SkipValue(Buf* buf);
+
+  BaseSchemaPtr Clone() override { return std::make_shared<DingoSchema<std::vector<int64_t>>>(); }
+
+  int SkipKey(Buf& buf) override;
+  int SkipValue(Buf& buf) override;
+
+  int EncodeKey(const std::any& data, Buf& buf) override;
+  int EncodeValue(const std::any& data, Buf& buf) override;
+
+  std::any DecodeKey(Buf& buf) override;
+  std::any DecodeValue(Buf& buf) override;
+
+ private:
+  void EncodeLongList(const std::vector<int64_t>& data, Buf& buf);
+  void DecodeLongList(Buf& buf, std::vector<int64_t>& data) const;
 };
 
 }  // namespace dingodb

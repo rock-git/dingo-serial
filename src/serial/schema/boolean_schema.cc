@@ -12,104 +12,67 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "serial/schema/boolean_schema.h"
+#include "boolean_schema.h"
+
+#include <any>
+#include <cassert>
+#include <cstdint>
+
+#include "serial/compiler.h"
 
 namespace dingodb {
 
-int DingoSchema<std::optional<bool>>::GetDataLength() { return 1; }
+constexpr int kDataLength = 2;
 
-int DingoSchema<std::optional<bool>>::GetWithNullTagLength() { return 2; }
+int DingoSchema<bool>::GetLength() { return kDataLength; }
 
-void DingoSchema<std::optional<bool>>::InternalEncodeValue(Buf* buf, bool data) { buf->Write(data); }
-
-void DingoSchema<std::optional<bool>>::InternalEncodeNull(Buf* buf) { buf->Write(0); }
-
-BaseSchema::Type DingoSchema<std::optional<bool>>::GetType() { return kBool; }
-
-void DingoSchema<std::optional<bool>>::SetIndex(int index) { this->index_ = index; }
-
-int DingoSchema<std::optional<bool>>::GetIndex() { return this->index_; }
-
-void DingoSchema<std::optional<bool>>::SetIsKey(bool key) { this->key_ = key; }
-
-bool DingoSchema<std::optional<bool>>::IsKey() { return this->key_; }
-
-int DingoSchema<std::optional<bool>>::GetLength() {
-  if (this->allow_null_) {
-    return GetWithNullTagLength();
-  }
-  return GetDataLength();
+int DingoSchema<bool>::SkipKey(Buf& buf) {
+  buf.Skip(kDataLength);
+  return kDataLength;
 }
 
-void DingoSchema<std::optional<bool>>::SetAllowNull(bool allow_null) { this->allow_null_ = allow_null; }
+int DingoSchema<bool>::SkipValue(Buf& buf) {
+  buf.Skip(kDataLength);
+  return kDataLength;
+}
 
-bool DingoSchema<std::optional<bool>>::AllowNull() { return this->allow_null_; }
+inline int DingoSchema<bool>::Encode(const std::any& data, Buf& buf) {
+  if (DINGO_UNLIKELY(!AllowNull() && !data.has_value())) {
+    throw std::runtime_error("Not allow null, but data not has value.");
+  }
 
-void DingoSchema<std::optional<bool>>::EncodeKey(Buf* buf, std::optional<bool> data) {
-  if (this->allow_null_) {
-    buf->EnsureRemainder(GetWithNullTagLength());
-    if (data.has_value()) {
-      buf->Write(k_not_null);
-      InternalEncodeValue(buf, data.value());
-    } else {
-      buf->Write(k_null);
-    }
+  if (data.has_value()) {
+    const auto& ref_data = std::any_cast<const bool&>(data);
+    buf.Write(k_not_null);
+    buf.Write(ref_data ? 1 : 0);
   } else {
-    if (data.has_value()) {
-      buf->EnsureRemainder(GetDataLength());
-      InternalEncodeValue(buf, data.value());
-    } else {
-      // WRONG EMPTY DATA
-    }
+    buf.Write(k_null);
+    buf.Write(0);
   }
+
+  return kDataLength;
 }
 
-void DingoSchema<std::optional<bool>>::EncodeKeyPrefix(Buf* buf, std::optional<bool> data) { EncodeKey(buf, data); }
+int DingoSchema<bool>::EncodeKey(const std::any& data, Buf& buf) { return Encode(data, buf); }
 
-std::optional<bool> DingoSchema<std::optional<bool>>::DecodeKey(Buf* buf) {
-  if (this->allow_null_) {
-    if (buf->Read() == this->k_null) {
-      buf->Skip(GetDataLength());
-      return std::nullopt;
-    }
+int DingoSchema<bool>::EncodeValue(const std::any& data, Buf& buf) { return Encode(data, buf); }
+
+std::any DingoSchema<bool>::DecodeKey(Buf& buf) {
+  if (buf.Read() == k_null) {
+    buf.Skip(kDataLength - 1);
+    return std::any();
   }
-  bool b = buf->Read();
-  return b;
+
+  return std::any(static_cast<bool>(buf.Read()));
 }
 
-void DingoSchema<std::optional<bool>>::SkipKey(Buf* buf) { buf->Skip(GetLength()); }
-
-void DingoSchema<std::optional<bool>>::EncodeValue(Buf* buf, std::optional<bool> data) {
-  if (this->allow_null_) {
-    buf->EnsureRemainder(GetWithNullTagLength());
-    if (data.has_value()) {
-      buf->Write(k_not_null);
-      InternalEncodeValue(buf, data.value());
-    } else {
-      buf->Write(k_null);
-      InternalEncodeNull(buf);
-    }
-  } else {
-    if (data.has_value()) {
-      buf->EnsureRemainder(GetDataLength());
-      InternalEncodeValue(buf, data.value());
-    } else {
-      // WRONG EMPTY DATA
-    }
+std::any DingoSchema<bool>::DecodeValue(Buf& buf) {
+  if (buf.Read() == k_null) {
+    buf.Skip(kDataLength - 1);
+    return std::any();
   }
-}
 
-std::optional<bool> DingoSchema<std::optional<bool>>::DecodeValue(Buf* buf) {
-  if (this->allow_null_) {
-    if (buf->Read() == this->k_null) {
-      buf->Skip(GetDataLength());
-      return std::nullopt;
-    }
-  }
-  bool b = buf->Read();
-  return b;
+  return std::any(static_cast<bool>(buf.Read()));
 }
-
-void DingoSchema<std::optional<bool>>::SkipValue(Buf* buf) { buf->Skip(GetLength()); }
 
 }  // namespace dingodb
