@@ -71,8 +71,6 @@ class RecordEncoder {
   int EncodeMaxKeyPrefix(char prefix, std::string& output) const;
 
   int EncodeMinKeyPrefix(char prefix, std::string& output) const;
-
-  static bool StringToBool(const std::string& str);
 };
 
 }  // namespace dingodb

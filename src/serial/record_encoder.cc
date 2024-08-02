@@ -25,7 +25,11 @@
 
 namespace dingodb {
 
-bool RecordEncoder::StringToBool(const std::string& str) { return !(str == "0" || str == "false"); }
+static bool StringToBool(const std::string& str) { return !(str == "0" || str == "false"); }
+static int32_t StringToInt32(const std::string& str) { return std::strtol(str.c_str(), nullptr, 10); }
+static int64_t StringToInt64(const std::string& str) { return std::strtoll(str.c_str(), nullptr, 10); }
+static float StringToFloat(const std::string& str) { return std::strtof(str.c_str(), nullptr); }
+static double StringToDouble(const std::string& str) { return std::strtod(str.c_str(), nullptr); }
 
 RecordEncoder::RecordEncoder(int schema_version, std::shared_ptr<std::vector<std::shared_ptr<BaseSchema>>> schemas,
                              long common_id) {
@@ -340,28 +344,28 @@ int RecordEncoder::EncodeKeyPrefix(char prefix, const std::vector<std::string>& 
         case BaseSchema::kInteger: {
           auto is = std::dynamic_pointer_cast<DingoSchema<std::optional<int32_t>>>(bs);
           if (is->IsKey()) {
-            is->EncodeKeyPrefix(&buf, std::optional<int32_t>(StringToBool(keys[i])));
+            is->EncodeKeyPrefix(&buf, std::optional<int32_t>(StringToInt32(keys[i])));
           }
           break;
         }
         case BaseSchema::kFloat: {
           auto fs = std::dynamic_pointer_cast<DingoSchema<std::optional<float>>>(bs);
           if (fs->IsKey()) {
-            fs->EncodeKeyPrefix(&buf, std::optional<float>(StringToBool(keys[i])));
+            fs->EncodeKeyPrefix(&buf, std::optional<float>(StringToFloat(keys[i])));
           }
           break;
         }
         case BaseSchema::kLong: {
           auto ls = std::dynamic_pointer_cast<DingoSchema<std::optional<int64_t>>>(bs);
           if (ls->IsKey()) {
-            ls->EncodeKeyPrefix(&buf, std::optional<int64_t>(StringToBool(keys[i])));
+            ls->EncodeKeyPrefix(&buf, std::optional<int64_t>(StringToInt64(keys[i])));
           }
           break;
         }
         case BaseSchema::kDouble: {
           auto ds = std::dynamic_pointer_cast<DingoSchema<std::optional<double>>>(bs);
           if (ds->IsKey()) {
-            ds->EncodeKeyPrefix(&buf, std::optional<double>(StringToBool(keys[i])));
+            ds->EncodeKeyPrefix(&buf, std::optional<double>(StringToDouble(keys[i])));
           }
           break;
         }
